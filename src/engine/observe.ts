@@ -245,7 +245,7 @@ export function describe(
     } else if (vb && bw === aw && aAmt < 0.6 * bAmt) {
       if (word === 'precipitate') dissolvedPart.push(id)
       else if (!PIECES.has(id)) push('solid', `Some of the ${colourOf(id, after.T)} solid dissolves.`)
-    } else if (vb && bw === aw && aAmt > 1.6 * bAmt && word === 'precipitate') {
+    } else if (vb && bw === aw && aAmt > 1.2 * bAmt && word === 'precipitate') {
       more.push(id)
     } else if (bw !== aw && vb && va && added.has(id) && !PIECES.has(id) && aAmt > 0.9 * bAmt) {
       push('solid', `The ${colourOf(id, after.T)} solid does not dissolve.`)
@@ -313,7 +313,7 @@ export function describe(
     const dry = drySolidDescription(v)
     if (!dry) {
       if (Object.keys(before.solids).length) push('dry', 'No solid remains in the tube.')
-    } else if (dry.name !== opts.beforeDryName || out.length === 0) {
+    } else if ((dry.name !== opts.beforeDryName && !out.some((o) => o.text.includes(`urns ${dry.name}`))) || out.length === 0) {
       push('residue', dry.name === opts.beforeDryName ? `The solid remains ${dry.name}.` : `The ${T > 250 ? 'hot ' : ''}solid turns ${dry.name}.`)
     }
   }

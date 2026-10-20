@@ -75,7 +75,7 @@ add({
 })
 add({
   id: 'Cu2+', formula: 'Cu²⁺', name: 'copper(II) ion', phase: 'aq', charge: 2, flame: 'Cu',
-  tint: '#4fa3e6', refConc: 0.25, colourName: (c) => (c < 0.012 ? 'very pale blue' : c < 0.15 ? 'pale blue' : 'blue'),
+  tint: '#3a96e0', refConc: 0.25, colourName: (c) => (c < 0.012 ? 'very pale blue' : c < 0.15 ? 'pale blue' : 'blue'),
 })
 add({ id: 'Zn2+', formula: 'Zn²⁺', name: 'zinc ion', phase: 'aq', charge: 2 })
 add({ id: 'Ag+', formula: 'Ag⁺', name: 'silver ion', phase: 'aq', charge: 1 })
@@ -91,7 +91,7 @@ add({
 })
 add({
   id: 'Cu(NH3)4 2+', formula: '[Cu(NH₃)₄(H₂O)₂]²⁺', name: 'tetraamminecopper(II)', phase: 'aq', charge: 2, flame: 'Cu',
-  tint: '#1d3fae', refConc: 0.05, colourName: (c) => (c < 0.004 ? 'blue' : 'deep blue'),
+  tint: '#318ce8', refConc: 0.01, colourName: (c) => (c < 0.003 ? 'blue' : 'deep blue'),
 })
 add({ id: 'Zn(NH3)4 2+', formula: '[Zn(NH₃)₄]²⁺', name: 'tetraamminezinc', phase: 'aq', charge: 2 })
 add({ id: 'Ag(NH3)2+', formula: '[Ag(NH₃)₂]⁺', name: 'diamminesilver(I)', phase: 'aq', charge: 1 })

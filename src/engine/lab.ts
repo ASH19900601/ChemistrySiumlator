@@ -119,8 +119,10 @@ export class Lab {
     return v
   }
 
+  private labelCounters: Partial<Record<VesselKind, number>> = {}
   private autoLabel(kind: VesselKind) {
-    const n = [...this.vessels.values()].filter((x) => x.kind === kind).length + 1
+    const n = (this.labelCounters[kind] ?? 0) + 1
+    this.labelCounters[kind] = n
     return `${VESSEL_SPECS[kind].label} ${n}`
   }
 
@@ -144,6 +146,11 @@ export class Lab {
   private elapse(dt: number, skip?: Vessel) {
     for (const v of this.vessels.values()) if (v !== skip) v.advance(dt, this.time)
     this.time += dt
+  }
+
+  /** Real time passing on the bench (not recorded in the journal). */
+  tick(dt: number) {
+    this.elapse(dt)
   }
 
   // ------------------------------------------------------------------ core mixing routine
