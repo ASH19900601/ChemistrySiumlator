@@ -1,46 +1,105 @@
-# Qualitative Analysis Lab（化學定性分析實驗模擬）
+# Qualitative Analysis Lab
 
-模擬 Cambridge IGCSE 0620 Paper 5 及 AS & A Level 9701 Paper 3 定性分析題的實驗。學生在虛擬實驗台上真正進行測試、自己記錄觀察及結論，最後按官方評分標準自行評分。介面為純英文，支援電腦、iPad（橫向及直向）和手機。
+**English** · [简体中文](README.zh-CN.md)
 
-## 運行
+A browser-based simulator for the qualitative-analysis question of Cambridge practical exams — IGCSE Chemistry 0620 Paper 5 (Question 2) and AS & A Level Chemistry 9701 Paper 3. Students carry out the tests on a simulated bench, write down their own observations and conclusions on the question paper, then mark themselves against the published mark scheme.
+
+Unlike an "Alternative to Practical" worksheet, nothing is scripted: every tube holds its actual contents, and what you see comes from a chemistry engine that reacts to exactly what you did — including mistakes.
+
+> **Private repository.** This repository contains Cambridge question papers, mark schemes and confidential instructions for private study. Do not make the repository public or deploy the app to a public URL (see [Deployment](#deployment)).
+
+## Features
+
+- **Real past papers** — 7 questions from 2023–2025 (4 × IGCSE 0620, 3 × 9701), with the original wording, the unknowns made up as in the confidential instructions, and the mark schemes.
+- **A simulated bench** — samples, a test-tube rack, reagent bottles, Bunsen burner, litmus, limewater, splints, flame-test wire, universal indicator paper, filter funnel, wash bottle and waste.
+- **A chemistry engine, not a lookup table** — stoichiometry, solubility products, "soluble in excess", redox, gas evolution, heating and slow changes over time (e.g. Fe(OH)₂ turning brown at the surface).
+- **Mistakes have consequences** — acidifying with HCl before AgNO₃, forgetting to acidify before Ba²⁺, re-using an un-rinsed tube, tap water, pouring in too much reagent at once, over-filling a tube…
+- **Free-form answers and self-marking** — no auto-marking; the results page shows your answers next to the mark scheme and the "supervisor's results" produced by the same engine.
+- **Works on phone, tablet and desktop** — responsive layouts for PC, iPad (portrait and landscape) and phones.
+- **Answers stay on the device** — work in progress, notes and self-marks are kept in the browser's local storage.
+
+## Quick start
+
+Requirements: **Node.js 18+** (developed on Node 22) and npm.
 
 ```bash
+git clone <this repository>
+cd ChemistrySiumlator
 npm install
-npm run dev      # 開發伺服器
-npm test         # 化學引擎及真題回歸測試
-npm run build    # 生成 dist/（靜態網站，可直接部署）
+npm run dev
 ```
 
-## 架構
+Open the address Vite prints (usually <http://localhost:5173>). To try it on a phone or iPad on the same Wi-Fi network:
 
-```
-src/engine/   化學反應引擎（與介面無關，可獨立測試）
-  species.ts     離子、沉澱、氣體及顏色（Beer–Lambert 混色）
-  compounds.ts   起始物質（含結晶水、受熱分解行為）
-  reagents.ts    實驗台試劑（濃度按 Confidential Instructions）
-  rules.ts       反應規則：中和、Ksp 沉澱、過量溶解、氧化還原、動力學過程、加熱
-  vessel.ts      試管狀態、規則求解、時間推進、氣體逸出、溫度
-  observe.ts     由狀態變化生成考試用語的觀察
-  lab.ts         實驗操作 API（加試劑、倒液、加熱、靜置、氣體測試、焰色、pH、過濾、清洗）
-  appearance.ts  供介面繪製的外觀數據
-src/papers/   真題案例（題目、樣本配方、試劑、評分標準、監考員操作腳本）
-src/ui/       React 介面（實驗台、試卷、筆記、自評）
+```bash
+npm run dev -- --host
 ```
 
-### 引擎原則
+and open the `Network:` address shown in the terminal on the device.
 
-- 每支試管保存實際內容（mmol 及體積），反應只取決於管內物質，不依賴「正確答案」。
-- 快速反應按優先次序處理（例如加入的 NaOH 先中和殘留酸，才會沉澱金屬氫氧化物）；沉澱以 Ksp 求平衡，「過量才溶解」以保留濃度模擬。
-- 慢反應隨時間推進：Fe(OH)₂／Mn(OH)₂ 在空氣中變棕、硫代硫酸根遇酸慢慢出硫、Fe³⁺–硫代硫酸根紫色褪去、H₂O₂ 催化分解等。
-- 錯誤操作有真實後果：用 HCl 酸化後加 AgNO₃ 會出現白色沉澱、未酸化時碳酸根與 Ba²⁺ 生成白色沉澱、未清洗的試管殘留前一個測試的物質、用自來水會令 AgNO₃ 稍為混濁、試管裝得太滿會溢出等。
-
-### 真題驗證
-
-`src/engine/__tests__/papers.test.ts` 按每份真題的步驟及監考員材料配方操作，檢查引擎產生的觀察符合官方評分標準。目前收錄：
-
-| 卷別 | 題目 |
+| Command | What it does |
 |---|---|
-| IGCSE 0620 | s24_51、w24_52、s23_51、s24_52 的 Q2 |
-| 9701 Paper 3 | s25_31、w24_34 的 Q3，及 s24_33 Q3(a) |
+| `npm run dev` | Development server with hot reload |
+| `npm test` | Engine unit tests and past-paper regression tests (Vitest) |
+| `npm run typecheck` | TypeScript type check |
+| `npm run build` | Production build into `dist/` (static files) |
+| `npm run preview` | Serve the production build locally |
 
-新增真題：在 `src/papers/` 加入一個 `PaperCase`（題目文字、樣本配方、試劑、評分標準、`supervisor` 腳本），再在測試中加入對應的評分標準檢查。
+## Documentation
+
+| Document | For |
+|---|---|
+| [User guide](docs/user-guide.md) · [用户指南](docs/user-guide.zh-CN.md) | Students and teachers: how to do a question on the simulated bench and mark it |
+| [Developer guide](docs/developer-guide.md) · [开发者指南](docs/developer-guide.zh-CN.md) | Engine design, project structure, adding past papers, reagents and reactions |
+
+## Included past papers
+
+| Paper | Series | Question | Marks | Unknowns |
+|---|---|---|---|---|
+| 0620/51 | May/June 2024 | Q2 | 14 | One solid, E, containing three ions |
+| 0620/52 | Oct/Nov 2024 | Q2 | 15 | Two solids, M and N |
+| 0620/51 | May/June 2023 | Q2 | 18 | One solid, E, containing three ions |
+| 0620/52 | May/June 2024 | Q2 | 18 | Solids H and I |
+| 9701/31 | May/June 2025 | Q3 | 12 | FA 7 (solution), FA 8 and FA 9 (sodium compounds) |
+| 9701/34 | Oct/Nov 2024 | Q3 | 12 | FB 6 (heated, residue tested) and FB 7 (salt solution) |
+| 9701/33 | May/June 2024 | Q3(a) | 10 | FA 5, a mixture of two cations and two anions (organic part (b) not simulated) |
+
+Each paper is regression-tested: `src/engine/__tests__/papers.test.ts` follows the question's instructions with the confidential-instruction samples and checks that the engine's observations contain what the mark scheme credits.
+
+## Project structure
+
+```
+src/
+  engine/        Chemistry engine (no UI code; tested on its own)
+  papers/        Past-paper cases: wording, samples, bench reagents, mark schemes, supervisor scripts
+  ui/            React interface: bench, glassware, question paper, notebook, self-marking
+tools/
+  dropbox_download.py   Downloads the research material from Dropbox (with hash check)
+dropbox_downloads/      Research material: past-paper archive (Git LFS) and research report
+docs/                   User and developer guides (English and Simplified Chinese)
+```
+
+Tech stack: Vite 5, React 18, TypeScript 5 (strict), Vitest 2. No backend.
+
+## Deployment
+
+`npm run build` produces a fully static site in `dist/` with relative asset paths (`base: './'`), so it can be served from any sub-path.
+
+Because the app contains Cambridge question papers and mark schemes, **do not publish it on an open URL** such as GitHub Pages (a Pages site is public even when the repository is private). Suitable options:
+
+- run it locally (`npm run dev`, or `npm run build && npm run preview`) or on a school intranet;
+- a static host with access control (password or single sign-on).
+
+## Research material
+
+`dropbox_downloads/` holds the material the papers were built from: `Chemistry_Qualitative_Practicals_2001-2026.zip` (question papers, mark schemes and confidential instructions, stored with **Git LFS** — run `git lfs pull` after cloning if you need it) and the research report in Markdown and HTML. The app itself does not need these files.
+
+## Limitations
+
+- Observations are semi-quantitative and tuned to the level of detail Cambridge mark schemes expect; they are not a full physical-chemistry simulation.
+- Only the qualitative-analysis question is simulated (no titration, rates or organic tests).
+- No auto-marking, accounts or teacher dashboard yet.
+
+## Copyright
+
+Question papers, mark schemes and confidential instructions © Cambridge University Press & Assessment, reproduced for private study only. Simulated observations may differ in detail from a real laboratory.
