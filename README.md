@@ -9,7 +9,8 @@ Unlike an "Alternative to Practical" worksheet, nothing is scripted: every tube 
 ## Features
 
 - **Real past papers** — 7 questions from 2023–2025 (4 × IGCSE 0620, 3 × 9701), with the original wording, the unknowns made up as in the confidential instructions, and the mark schemes.
-- **A simulated bench** — samples, a test-tube rack, reagent bottles, Bunsen burner, litmus, limewater, splints, flame-test wire, universal indicator paper, filter funnel, wash bottle and waste.
+- **A hands-on bench** — everything is real apparatus operated with your hands, not buttons: pick up a bottle and hold it over a tube to pour, park a dropper in a tube and squeeze it drop by drop, turn on the gas and strike a match to light the Bunsen burner, put a tube in the flame to heat it, dampen litmus paper at the wash bottle and hold it at the mouth of the tube, light a splint, collect gas with a teat pipette and bubble it through limewater, filter through a funnel. Samples stand in the rack with the other tubes. Drag, or tap to lift and tap the target; a ghost-hand demonstration shows the moves.
+- **Real time** — reactions, settling, cooling and slow changes happen while you watch; the clock on the wall can run time ten times faster.
 - **A chemistry engine, not a lookup table** — stoichiometry, solubility products, "soluble in excess", redox, gas evolution, heating and slow changes over time (e.g. Fe(OH)₂ turning brown at the surface).
 - **Mistakes have consequences** — acidifying with HCl before AgNO₃, forgetting to acidify before Ba²⁺, re-using an un-rinsed tube, tap water, pouring in too much reagent at once, over-filling a tube…
 - **Free-form answers and self-marking** — no auto-marking; the results page shows your answers next to the mark scheme and the "supervisor's results" produced by the same engine.

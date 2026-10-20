@@ -57,12 +57,17 @@ src/
     index.ts               PAPERS list, paperById()
   ui/
     App.tsx                screens: Home → Exam → Results
-    Exam.tsx               bench, action panel, question paper, notebook, mobile tabs
-    Tube.tsx               SVG glassware (liquid, precipitate, bubbles, flame, stopper)
-    Apparatus.tsx          reagent bottles and apparatus icons
-    Sheets.tsx             dialogs: dropper, pour, divide, heat, stand, gas test
+    Exam.tsx               exam screen: bench, question paper, notebook, mobile tabs, real-time loop
+    Tube.tsx               SVG glassware (liquid, precipitate, bubbles, stopper); also embeds in the bench scene
+    bench/
+      layout.ts            scene size and where every piece of apparatus sits; tube geometry
+      art.tsx              SVG drawings of the apparatus (bottles, dropper, burner, splints, papers, …)
+      model.ts             BenchModel: what is held, where it is, what a gesture means; drives the Lab
+      Bench.tsx            renders the scene and forwards pointer input to the model
+      Demo.tsx             first-run ghost-hand demonstration
+      sound.ts             synthesised sound effects (WebAudio)
+      __tests__/           gesture tests on the model
     PaperPane.tsx          question paper with answer spaces
-    ResultVisual.tsx       pictures of test results (litmus, limewater, splints, flame, UI paper)
     Results.tsx            self-marking page
     storage.ts             guarded localStorage helpers
     styles.css             all styles, responsive breakpoints
@@ -170,6 +175,23 @@ Main `Lab` methods (all return an `ActionResult` with `observations` — plus `f
 | `flameTest(id)`, `pHTest(id)` | |
 | `filter(id)` | returns `filtrateId` and `residueId` (filter paper) |
 | `empty(id)`, `rinse(id)`, `discard(id)` | `empty` leaves a wet film; `rinse` cleans |
+
+The interactive bench works in real time and uses a second, continuous API. An action is opened with `begin()`, material is added in small steps while bench time passes with `tick()`, and the action is written up (one journal entry) a few seconds after `release()`, so delayed changes such as fizzing are included:
+
+| Method | Purpose |
+|---|---|
+| `begin(vesselId, label, {heating?})` → `OpenAction` | start an action on a vessel |
+| `pourStep(a, source, cm3)` | pour from `{reagentId}` or `{vesselId}` (a dry tube tips its solid out) |
+| `dropStep(a, reagentId, n?)` | drops from a dropper bottle |
+| `scoop(source, grams)` / `deposit(a, n)` | take a spatula measure (or a piece of metal) / tip it into the vessel |
+| `filterStep(a, source, paperId, cm3)` | pour through a filter paper (vessel of kind `filter-paper`) into the action's vessel |
+| `setHeating(id, mode \| null)` | heat while time passes |
+| `release(a, label?, linger?)`, `cancel(a)`, `flush()` | finish (written up after `linger` s), drop an empty action, write up everything |
+| `agitate(id)` | shake |
+| `mouthTest(id, test, {damp})` | test paper / splint at the mouth of the tube, no time passes (a dry paper shows no change) |
+| `indicatorDip(id, paper)` | dip red litmus, blue litmus or universal indicator paper into the contents |
+| `collectGas(id)` / `bubbleGas(sample, id)` | teat pipette: draw in the gas at the mouth / bubble it through a liquid (limewater turns milky) |
+| `flameReading(id)`, `gasReading(id, test)`, `note(…)` | readings without side effects; record a note in the journal |
 
 ## 5. Adding a past paper
 
@@ -280,19 +302,28 @@ Guidelines:
 | `procedure.test.ts` | order of addition and existing contents: wrong acid, no acidification, un-rinsed tubes, tap water, leftover H₂O₂, transient precipitates, re-acidifying complexes, ammonia lost on cooling, slow air oxidation |
 | `papers.test.ts` | every `PaperCase` supervisor run against its mark scheme; marks add up |
 | `rules.test.ts` | every species referenced by a rule exists; every rule conserves charge |
+| `thermal.test.ts` | heated salts keep their non-volatile ions; boiling evaporates water, warming does not |
+| `realtime.test.ts` | continuous API: pours, drops, heating in the flame, damp vs dry litmus, dipping litmus, teat pipette and limewater, filtering |
 | `helpers.ts` | `solutionLab`, `solidLab`, `portion`, `dropwiseThenExcess`, `text` |
+| `ui/bench/__tests__/model.test.ts` | gestures on the bench model (drag, tap-then-tap, press-and-hold): pouring, dropper, burner, splint, spatula, teat pipette, wire, litmus, funnel, waste |
 
 Write a procedure test whenever you fix a behaviour caused by an operation order or leftover contents, so it stays fixed.
 
 ## 8. The user interface
 
-- `App.tsx` holds the screen state (`home` / `exam` / `results`). Each attempt mounts a fresh `Exam` with a new `Lab`.
-- `Exam.tsx` calls `lab.tick(2)` every 2 s so time passes on the bench. Actions run through `run()`: the engine computes the action in one go and returns `frames` (the vessel's `Appearance` at each step of an addition, heating or standing); the UI replays these frames on the bench and in the dropper preview (1–4.5 s), then shows the result. Short-lived changes such as a precipitate that forms and redissolves are therefore visible. Input is ignored while an action plays. The rack is limited to 18 vessels.
-- Observation text is hidden unless the *Observation text* switch is on; the picture (`Tube.tsx`, `ResultVisual.tsx`) is always shown.
-- Glassware is SVG: liquids use multiply blending, precipitates and turbidity use noise filters (`SvgDefs` in `Tube.tsx`), bubbles are CSS animations.
-- Layouts (`styles.css`): ≥ 1100 px (desktop, iPad landscape) = bench left, paper/notebook right; ≤ 1099 px = one pane at a time with bottom tabs (Lab / Paper / Notebook); tall tablets in portrait (700–1099 px wide, ≥ 960 px high, e.g. iPad) = bench above, paper below; ≤ 640 px = compact phone sizing. Dialogs are bottom sheets on every size.
-- `storage.ts` stores answers, notes, marks and preferences under the `qa-lab:` prefix; every access is wrapped in `try/catch` so the app works when storage is unavailable.
-- The UI language is English (matching the exam).
+- `App.tsx` holds the screen state (`home` / `exam` / `results`). Each attempt mounts a fresh `Exam` with a new `Lab` and `BenchModel`.
+- **Everything on the bench is apparatus.** There are no action buttons: an item is picked up and brought to something else. `BenchModel` (`bench/model.ts`) decides what that means from *what is held* and *which zone it is over*:
+  - zones are worked out geometrically from the layout (`zoneFor`): a tube's mouth, inside or liquid; a rack slot; the burner's upper or lower heating position; the flame; the wash-bottle nozzle; waste, sink, tile, funnel, boxes, jars;
+  - **discrete** actions happen on release (tube into a slot or the flame, stopper on, spatula, dropper parked in a tube, funnel onto a tube, tube into the waste or sink);
+  - **continuous / dwell** actions happen while the item stays there (a bottle pours while held over a tube; a strip tests the gas after ~0.7 s at the mouth; a splint lights after ~0.4 s in the flame);
+  - two input styles share the same logic: **drag**, and **tap to lift, then tap the target** (press and hold on the target for continuous actions). With an item lifted, a press elsewhere is resolved on release or after 160 ms: moving drags the other object (the lifted item is put back), holding still starts the hold action, a quick tap uses the item there.
+- Apparatus state lives in the model: burner (gas, lit, air hole), splints (unlit / burning / glowing / dead, with burn-out times), matches, strips (damp, colour), teat pipette (gas sample), wire (loaded reading), funnel (tube, filter paper vessel), parked dropper, used strips on the tile, fast clock.
+- `Exam.tsx` calls `model.step(dt)` every 100 ms; the clock on the bench runs bench time ×1 or ×10. The engine's open actions are written up when they settle, and the latest entry can be shown as a caption when *Observation text* is on.
+- `Bench.tsx` renders the scene (`viewBox` 1360 × 900) scaled to fit; on narrow phones it fills the height and scrolls sideways. Invisible hit rectangles (`model.hitRects()`, first = on top) receive the pointer; they have `touch-action: none` so drags do not scroll, while the background still pans.
+- Glassware is SVG: liquids use multiply blending, precipitates and turbidity use noise filters (`SvgDefs` in `Tube.tsx`), bubbles, flames, streams and drops are CSS animations. Tubes are memoised on their (cached) `Appearance`.
+- Layouts (`styles.css`): ≥ 1100 px (desktop, iPad landscape) = bench left, paper/notebook right (the paper can be hidden with ⇥); ≤ 1099 px = one pane at a time with bottom tabs (Lab / Paper / Notebook); tall tablets in portrait (700–1099 px wide, ≥ 960 px high) = bench above, paper below.
+- `storage.ts` stores answers, notes, marks and preferences (observation text, sound, demo seen) under the `qa-lab:` prefix; every access is wrapped in `try/catch`.
+- The UI language is English (matching the exam). Text on the bench is limited to what is printed on real apparatus (bottle labels, tube labels).
 
 ## 9. Building
 

@@ -4,7 +4,7 @@ import type { Appearance } from '../engine'
 type RGB = [number, number, number]
 const rgba = ([r, g, b]: RGB, a: number) => `rgba(${Math.round(r)},${Math.round(g)},${Math.round(b)},${a.toFixed(3)})`
 
-const GEOM = {
+export const GEOM = {
   'test-tube': { w: 34, h: 210, wall: 2 },
   'hard-glass-tube': { w: 36, h: 210, wall: 3.2 },
   'boiling-tube': { w: 52, h: 236, wall: 2.4 },
@@ -21,6 +21,8 @@ interface Props {
   big?: boolean
   onClick?: () => void
   badge?: string
+  /** embed in a larger SVG scene: top-left corner and scale; the bench draws the flame itself */
+  at?: { x: number; y: number; s: number }
 }
 
 /** Deterministic pseudo-random numbers so bubbles do not jump between renders. */
@@ -30,7 +32,7 @@ function seeded(seed: number) {
   return () => (s = (s * 16807) % 2147483647) / 2147483647
 }
 
-export function Tube({ a, id, selected, busy, onClick, badge }: Props) {
+export function Tube({ a, id, selected, busy, onClick, badge, at }: Props) {
   if (a.kind === 'filter-paper') return <FilterPaper a={a} selected={selected} onClick={onClick} />
   const g = GEOM[a.kind]
   const pad = 14
@@ -46,7 +48,7 @@ export function Tube({ a, id, selected, busy, onClick, badge }: Props) {
   const solidTop = yB - a.solid * usable
   const clip = `clip-${id}`
   const interior = `M ${x0} ${y0} L ${x0} ${yB - r} A ${r} ${r} 0 0 0 ${x0 + g.w} ${yB - r} L ${x0 + g.w} ${y0} Z`
-  const heating = a.heating || busy === 'heat'
+  const heating = !at && (a.heating || busy === 'heat')
   const bubbleCount = Math.round(a.bubbles * 10) + (busy === 'pour' && a.liquidLevel > 0 ? 2 : 0)
   const bubbles = useMemo(() => {
     const rnd = seeded(id.split('').reduce((s, c) => s + c.charCodeAt(0), 7) * 97)
@@ -62,10 +64,11 @@ export function Tube({ a, id, selected, busy, onClick, badge }: Props) {
   return (
     <svg
       viewBox={`0 0 ${W} ${H}`}
-      className={`tube tube-${a.kind}${selected ? ' selected' : ''}${busy === 'shake' ? ' shaking' : ''}`}
+      className={at ? 'tube-embed' : `tube tube-${a.kind}${selected ? ' selected' : ''}${busy === 'shake' ? ' shaking' : ''}`}
       onClick={onClick}
-      role="button"
+      role={at ? undefined : 'button'}
       aria-label={a.label}
+      {...(at ? { x: at.x, y: at.y, width: W * at.s, height: H * at.s, overflow: 'visible' } : {})}
     >
       <defs>
         <clipPath id={clip}>

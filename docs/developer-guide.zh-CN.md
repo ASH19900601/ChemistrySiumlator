@@ -57,12 +57,17 @@ src/
     index.ts               PAPERS 列表、paperById()
   ui/
     App.tsx                画面：首页 → 考试 → 结果
-    Exam.tsx               实验台、操作面板、试卷、笔记、手机标签
-    Tube.tsx               SVG 玻璃仪器（液体、沉淀、气泡、火焰、塞子）
-    Apparatus.tsx          试剂瓶及仪器图标
-    Sheets.tsx             对话框：滴管、倒液、分装、加热、静置、气体检验
+    Exam.tsx               考试画面：实验台、试卷、笔记、手机标签、实时循环
+    Tube.tsx               SVG 玻璃仪器（液体、沉淀、气泡、塞子）；也可嵌入实验台场景
+    bench/
+      layout.ts            场景尺寸及每件仪器的位置；试管几何
+      art.tsx              仪器的 SVG 绘图（试剂瓶、滴管、本生灯、木条、试纸……）
+      model.ts             BenchModel：手上拿着什么、在哪里、手势代表什么；驱动 Lab
+      Bench.tsx            绘制场景并把指针输入交给模型
+      Demo.tsx             首次使用时的"虚拟手"示范
+      sound.ts             合成音效（WebAudio）
+      __tests__/           针对模型的手势测试
     PaperPane.tsx          带答题位置的试卷
-    ResultVisual.tsx       测试结果图示（石蕊、石灰水、木条、焰色、通用指示剂试纸）
     Results.tsx            自我评分页面
     storage.ts             带保护的 localStorage 工具函数
     styles.css             全部样式及响应式断点
@@ -170,6 +175,23 @@ console.log(lab.addReagent(t.id, 'NH3', { cm3: 4 }).observations)   // 深蓝色
 | `flameTest(id)`、`pHTest(id)` | |
 | `filter(id)` | 返回 `filtrateId` 和 `residueId`（滤纸） |
 | `empty(id)`、`rinse(id)`、`discard(id)` | `empty` 会留下液膜；`rinse` 会清洗干净 |
+
+交互实验台以实时方式运行，使用另一套连续 API：用 `begin()` 开始一个操作，在 `tick()` 推进实验台时间的同时分小步加入物质，`release()` 后再过几秒才写入记录（一条记录），因此延迟出现的变化（例如冒泡）也会包括在内：
+
+| 方法 | 用途 |
+|---|---|
+| `begin(vesselId, label, {heating?})` → `OpenAction` | 对一个容器开始操作 |
+| `pourStep(a, source, cm3)` | 从 `{reagentId}` 或 `{vesselId}` 倾倒（干燥的试管会把固体倒出） |
+| `dropStep(a, reagentId, n?)` | 从滴瓶滴加 |
+| `scoop(source, grams)` / `deposit(a, n)` | 取一药匙（或一片金属）／倒进容器 |
+| `filterStep(a, source, paperId, cm3)` | 经滤纸（`filter-paper` 类容器）倒入操作对应的容器 |
+| `setHeating(id, mode \| null)` | 在时间流逝时加热 |
+| `release(a, label?, linger?)`、`cancel(a)`、`flush()` | 结束（`linger` 秒后写入记录）、丢弃空操作、立即写入全部记录 |
+| `agitate(id)` | 振荡 |
+| `mouthTest(id, test, {damp})` | 在试管口用试纸／木条检验，不推进时间（干燥试纸没有变化） |
+| `indicatorDip(id, paper)` | 把红色石蕊、蓝色石蕊或通用指示剂试纸浸入内容物 |
+| `collectGas(id)` / `bubbleGas(sample, id)` | 胶头滴管：在试管口吸入气体／把气体通入液体（石灰水变浑浊） |
+| `flameReading(id)`、`gasReading(id, test)`、`note(…)` | 无副作用的读数；在记录中写入备注 |
 
 ## 5. 新增真题
 
@@ -280,19 +302,28 @@ r({ id: 'ClO+H+Cl', type: 'kinetic', reactants: { 'ClO-': 1, 'Cl-': 1, 'H+': 2 }
 | `procedure.test.ts` | 加入顺序及原有内容：用错酸、未酸化、未清洗试管、自来水、残留 H₂O₂、短暂沉淀、配合物再酸化、冷却后氨气散失、缓慢空气氧化 |
 | `papers.test.ts` | 每个 `PaperCase` 的监考员操作对照评分标准；分数总和正确 |
 | `rules.test.ts` | 规则引用的每个物种都存在；每条规则电荷守恒 |
+| `thermal.test.ts` | 受热的盐保留非挥发性离子；沸腾会蒸发水分，温和加热不会 |
+| `realtime.test.ts` | 连续 API：倾倒、滴加、在火焰中加热、湿润与干燥石蕊试纸、浸入试纸、胶头滴管与石灰水、过滤 |
 | `helpers.ts` | `solutionLab`、`solidLab`、`portion`、`dropwiseThenExcess`、`text` |
+| `ui/bench/__tests__/model.test.ts` | 实验台模型上的手势（拖动、点一下再点一下、按住）：倾倒、滴管、本生灯、木条、药匙、胶头滴管、金属丝、石蕊试纸、漏斗、废液缸 |
 
 每当修复一个由操作顺序或残留内容引起的问题时，请写一个 procedure 测试，确保问题不会复发。
 
 ## 8. 用户界面
 
-- `App.tsx` 保存画面状态（`home`／`exam`／`results`）。每次作答都会挂载一个新的 `Exam` 和新的 `Lab`。
-- `Exam.tsx` 每 2 秒调用一次 `lab.tick(2)`，让实验台上的时间流逝。操作通过 `run()` 执行：引擎一次算完整个操作，并返回 `frames`（加试剂、加热或静置时每一步的容器外观 `Appearance`）；界面先在实验台和滴管预览中回放这些画面（1–4.5 秒），再显示结果。因此短暂出现的变化（例如生成后又溶解的沉淀）也看得见。回放期间忽略输入。试管架最多 18 个容器。
-- 除非打开 *Observation text* 开关，否则隐藏观察文字；画面（`Tube.tsx`、`ResultVisual.tsx`）总是显示。
-- 玻璃仪器使用 SVG：液体使用 multiply 混合，沉淀和浑浊使用噪声滤镜（`Tube.tsx` 中的 `SvgDefs`），气泡使用 CSS 动画。
-- 布局（`styles.css`）：宽度 ≥ 1100 px（电脑、iPad 横屏）＝左边实验台、右边试卷／笔记；≤ 1099 px＝每次显示一个面板，底部有标签（Lab / Paper / Notebook）；竖屏的高平板（宽 700–1099 px、高 ≥ 960 px，如 iPad）＝上方实验台、下方试卷；≤ 640 px＝手机紧凑尺寸。所有尺寸下对话框都是底部弹出面板。
-- `storage.ts` 以 `qa-lab:` 为前缀保存答案、笔记、分数和偏好设置；每次访问都包在 `try/catch` 中，存储不可用时程序仍可运行。
-- 界面语言为英文（与考试一致）。
+- `App.tsx` 保存画面状态（`home`／`exam`／`results`）。每次作答都会挂载新的 `Exam`、`Lab` 和 `BenchModel`。
+- **实验台上的一切都是仪器。** 没有操作按钮：拿起一样东西，带到另一样东西那里。`BenchModel`（`bench/model.ts`）根据*手上拿着什么*和*它在哪个区域上方*决定这代表什么：
+  - 区域按布局以几何方式计算（`zoneFor`）：试管口、管内或液面以下；试管架空位；本生灯的上／下加热位置；火焰；洗瓶嘴；废液缸、水槽、白瓷板、漏斗、试管盒、广口瓶；
+  - **一次性**动作在松手时发生（试管放进空位或火焰、塞上塞子、药匙、滴管停放在试管上、漏斗放到试管上、试管拖到废液缸或水槽）；
+  - **持续／停留**动作在物件停留期间发生（试剂瓶放在试管上方就一直倾倒；试纸在试管口约 0.7 秒后检验气体；木条在火焰中约 0.4 秒后点燃）；
+  - 两种输入方式共用同一套逻辑：**拖动**，以及**点一下拿起、再点一下目标**（持续动作则在目标上按住）。拿起物件后，在别处按下会在松手或 160 毫秒后才判断：移动表示拖动另一件物件（先把拿着的放回），按住不动表示开始持续动作，快速点击表示在该处使用物件。
+- 仪器状态保存在模型中：本生灯（燃气、是否点燃、空气孔）、木条（未点燃／燃烧／带火星／熄灭，含燃尽时间）、火柴、试纸（是否湿润、颜色）、胶头滴管（气体样本）、金属丝（已蘸取的读数）、漏斗（所在试管、滤纸容器）、停放的滴管、白瓷板上用过的试纸、时钟快进。
+- `Exam.tsx` 每 100 毫秒调用一次 `model.step(dt)`；实验台的时钟让实验台时间以 ×1 或 ×10 速度运行。引擎中未结束的操作在稳定后写入记录；打开 *Observation text* 时，最新一条记录会以字幕显示。
+- `Bench.tsx` 把场景（`viewBox` 1360 × 900）缩放到合适大小；在较窄的手机上会占满高度并左右滚动。不可见的点击矩形（`model.hitRects()`，列表第一项在最上层）接收指针事件；它们设置了 `touch-action: none`，拖动时不会滚动，而背景仍可平移。
+- 玻璃仪器使用 SVG：液体使用 multiply 混合，沉淀和浑浊使用噪声滤镜（`Tube.tsx` 中的 `SvgDefs`），气泡、火焰、液流和液滴使用 CSS 动画。试管以（已缓存的）`Appearance` 做记忆化渲染。
+- 布局（`styles.css`）：宽度 ≥ 1100 px（电脑、iPad 横屏）＝左边实验台、右边试卷／笔记（可用 ⇥ 隐藏试卷）；≤ 1099 px＝每次显示一个面板，底部有标签（Lab / Paper / Notebook）；竖屏的高平板（宽 700–1099 px、高 ≥ 960 px）＝上方实验台、下方试卷。
+- `storage.ts` 以 `qa-lab:` 为前缀保存答案、笔记、分数和偏好设置（观察文字、声音、是否已看过示范）；每次访问都包在 `try/catch` 中。
+- 界面语言为英文（与考试一致）。实验台上的文字只限于真实仪器上本来就有的文字（试剂瓶标签、试管标签）。
 
 ## 9. 构建
 

@@ -138,7 +138,8 @@ ppt('Co(OH)2', { 'Co2+': 1, 'OH-': 2 }, 'Co(OH)2(s)', 1e-15)
 ppt('Mn(OH)2', { 'Mn2+': 1, 'OH-': 2 }, 'Mn(OH)2(s)', 2e-13)
 ppt('Pb(OH)2', { 'Pb2+': 1, 'OH-': 2 }, 'Pb(OH)2(s)', 1.2e-15)
 ppt('Mg(OH)2', { 'Mg2+': 1, 'OH-': 2 }, 'Mg(OH)2(s)', 5.6e-12)
-ppt('Ca(OH)2', { 'Ca2+': 1, 'OH-': 2 }, 'Ca(OH)2(s)', 5.5e-6)
+// concentration-based value (no activity coefficients): saturated limewater is ~0.02 mol dm⁻³
+ppt('Ca(OH)2', { 'Ca2+': 1, 'OH-': 2 }, 'Ca(OH)2(s)', 4e-5)
 // Ba(OH)2 is fairly soluble: only a faint precipitate unless [Ba2+] is very low (9701 notes)
 ppt('Ba(OH)2', { 'Ba2+': 1, 'OH-': 2 }, 'Ba(OH)2(s)', 4.7e-2)
 // 2Ag+ + 2OH- ⇌ Ag2O + H2O ; Ksp(AgOH) ≈ 2e-8

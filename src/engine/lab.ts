@@ -3,7 +3,7 @@
 
 import { appearance, type Appearance } from './appearance'
 import { COMPOUNDS, compoundSpecies } from './compounds'
-import { describe, snapshot, Tracker, cap, drySolidDescription, type Observation } from './observe'
+import { describe, snapshot, Tracker, cap, drySolidDescription, type Observation, type Snapshot } from './observe'
 import { REAGENTS, type ReagentDef } from './reagents'
 import { SPECIES, type FlameElement } from './species'
 import { estimatePH, vapourPressure, Vessel, VESSEL_SPECS, type HeatMode, type VesselKind } from './vessel'
@@ -40,6 +40,7 @@ export type GasTest =
   | 'lighted-splint'
   | 'acidified-kmno4'
   | 'acidified-dichromate-paper'
+  | 'damp-universal-indicator'
 
 export const GAS_TEST_LABELS: Record<GasTest, string> = {
   'damp-red-litmus': 'damp red litmus paper',
@@ -49,6 +50,34 @@ export const GAS_TEST_LABELS: Record<GasTest, string> = {
   'lighted-splint': 'lighted splint',
   'acidified-kmno4': 'acidified aqueous potassium manganate(VII)',
   'acidified-dichromate-paper': 'acidified potassium dichromate(VI) paper',
+  'damp-universal-indicator': 'damp universal indicator paper',
+}
+
+/** Where material comes from in a pour: a bench reagent or another vessel. */
+export type Source = { vesselId: string } | { reagentId: string }
+
+export type IndicatorPaper = 'red-litmus' | 'blue-litmus' | 'universal-indicator'
+
+/**
+ * An action that is still going on: a pour that lasts as long as the bottle is held over the
+ * tube, drops from a dropper, a tube held in the flame. Observations are worked out when it is
+ * released and has had a few seconds to settle, so delayed changes (fizzing, colours) count.
+ */
+export interface OpenAction {
+  vesselId: string
+  label: string
+  before: Snapshot
+  beforeAmounts: Map<string, number>
+  beforeDryName?: string
+  tracker: Tracker
+  mark: number
+  start: number
+  addedAmounts: Map<string, number>
+  dissolving: boolean
+  heating: boolean
+  closeAt: number | null
+  /** post-process the observations when the action is finished */
+  finalize?: (obs: Observation[]) => Observation[]
 }
 
 export interface ActionResult {
@@ -160,6 +189,15 @@ export class Lab {
   /** Real time passing on the bench (not recorded in the journal). */
   tick(dt: number) {
     this.elapse(dt)
+    for (const a of [...this.actions]) {
+      const v = this.vessels.get(a.vesselId)
+      if (!v) {
+        this.actions.splice(this.actions.indexOf(a), 1)
+        continue
+      }
+      a.tracker.update(snapshot(v))
+      if (a.closeAt !== null && this.time >= a.closeAt) this.finish(a)
+    }
   }
 
   // ------------------------------------------------------------------ core mixing routine
@@ -364,6 +402,13 @@ export class Lab {
     const v = this.vessel(vesselId)
     v.advance(4, this.time)
     this.elapse(4, v)
+    const text = this.gasReading(v.id, test)
+    return this.record({ vesselId: v.id, action: `Test the gas with ${GAS_TEST_LABELS[test]}`, observations: [{ kind: 'gas-test', text }], time: this.time })
+  }
+
+  /** What a test held at the mouth of the tube shows right now (no time passes, nothing recorded). */
+  gasReading(vesselId: string, test: GasTest): string {
+    const v = this.vessel(vesselId)
     const g = (id: string) => v.headspace.get(id) ?? 0
     // soluble gases: head-space gas from heating solids, or vapour above a solution
     const nh3 = Math.max(g('NH3(g)') / 0.006, vapourPressure(v, 'NH3') / 0.0025) * 0.0061
@@ -411,11 +456,25 @@ export class Lab {
         if (so2 > 0.006) text = 'The paper turns from orange to green.'
         else text = 'No change – the paper stays orange.'
         break
+      case 'damp-universal-indicator':
+        if (cl2 > 0.003) text = 'The damp universal indicator paper is bleached (turns white).'
+        else if (nh3 > 0.006) text = 'The damp universal indicator paper turns blue.'
+        else if (acidic) text = 'The damp universal indicator paper turns red.'
+        else text = 'No change – the damp universal indicator paper stays green.'
+        break
     }
-    return this.record({ vesselId: v.id, action: `Test the gas with ${GAS_TEST_LABELS[test]}`, observations: [{ kind: 'gas-test', text }], time: this.time })
+    return text
   }
 
   flameTest(vesselId: string): ActionResult {
+    const v = this.vessel(vesselId)
+    const text = this.flameReading(v.id)
+    this.elapse(10)
+    return this.record({ vesselId: v.id, action: 'Carry out a flame test', observations: [{ kind: 'flame', text }], time: this.time })
+  }
+
+  /** The flame colour the contents of a vessel give (no time passes, nothing recorded). */
+  flameReading(vesselId: string): string {
     const v = this.vessel(vesselId)
     const el = flameElements(v)
     const total = Object.values(el).reduce((s, x) => s + x, 0)
@@ -430,8 +489,7 @@ export class Lab {
         text = { Li: 'Red flame.', K: 'Lilac flame.', Ca: 'Orange-red flame.', Ba: 'Light green flame.', Cu: 'Blue-green flame.', Sr: 'Red flame.', Na: 'Yellow flame.' }[top]
       }
     }
-    this.elapse(10)
-    return this.record({ vesselId: v.id, action: 'Carry out a flame test', observations: [{ kind: 'flame', text }], time: this.time })
+    return text
   }
 
   pHTest(vesselId: string): ActionResult {
@@ -509,8 +567,271 @@ export class Lab {
   }
 
   discard(vesselId: string) {
+    for (const a of [...this.actions]) if (a.vesselId === vesselId) this.actions.splice(this.actions.indexOf(a), 1)
     this.vessels.delete(vesselId)
     this.added.delete(vesselId)
+  }
+
+  // ------------------------------------------------------------------ continuous (real-time) actions
+  private actions: OpenAction[] = []
+
+  /** Start an action on a vessel. Material is added with the *Step methods; time passes with tick(). */
+  begin(vesselId: string, label: string, opts: { heating?: boolean } = {}): OpenAction {
+    const v = this.vessel(vesselId)
+    // an earlier action on this vessel that is still settling is written up first
+    for (const a of [...this.actions]) if (a.vesselId === v.id) this.finish(a)
+    const before = snapshot(v)
+    const a: OpenAction = {
+      vesselId: v.id,
+      label,
+      before,
+      beforeAmounts: new Map(v.n),
+      beforeDryName: v.wet ? undefined : drySolidDescription(v)?.name,
+      tracker: new Tracker(before),
+      mark: v.log.length,
+      start: this.time,
+      addedAmounts: new Map(),
+      dissolving: false,
+      heating: !!opts.heating,
+      closeAt: null,
+    }
+    this.actions.push(a)
+    return a
+  }
+
+  /** The gesture is over; the action is written up after `linger` seconds of bench time. */
+  release(a: OpenAction, label?: string, linger = 4): ActionResult | undefined {
+    if (label) a.label = label
+    if (!this.actions.includes(a)) return undefined
+    a.closeAt = this.time + linger
+    if (linger <= 0) return this.finish(a)
+    return undefined
+  }
+
+  /** Write up every open action now (e.g. before marking). */
+  flush() {
+    for (const a of [...this.actions]) this.finish(a)
+  }
+
+  isOpen(a: OpenAction) {
+    return this.actions.includes(a)
+  }
+
+  /** Drop an action that turned out to do nothing (e.g. a dropper put down without a squeeze). */
+  cancel(a: OpenAction) {
+    const i = this.actions.indexOf(a)
+    if (i >= 0) this.actions.splice(i, 1)
+  }
+
+  private finish(a: OpenAction): ActionResult | undefined {
+    const i = this.actions.indexOf(a)
+    if (i < 0) return undefined
+    this.actions.splice(i, 1)
+    const v = this.vessels.get(a.vesselId)
+    if (!v) return undefined
+    let obs = describe(v, a.before, a.tracker, v.log.slice(a.mark), this.added.get(v.id)!, {
+      heating: a.heating && !v.wet,
+      dissolving: a.dissolving,
+      seconds: Math.max(1, this.time - a.start),
+      addedAmounts: a.addedAmounts,
+      beforeAmounts: a.beforeAmounts,
+      beforeDryName: a.beforeDryName,
+    })
+    if (a.finalize) obs = a.finalize(obs)
+    return this.record({ vesselId: v.id, action: a.label, observations: obs, time: this.time })
+  }
+
+  /** Take up to `cm3` of liquid (or the equivalent amount of solid) from a source. */
+  private take(src: Source, cm3: number): { n: Map<string, number>; V: number; solidFromVessel: boolean } {
+    if ('reagentId' in src) {
+      const r = REAGENTS[src.reagentId]
+      if (!r || r.kind !== 'solution') throw new Error(`${src.reagentId} cannot be poured`)
+      const n = new Map<string, number>()
+      for (const [id, c] of Object.entries(r.conc ?? {})) n.set(id, c * cm3)
+      return { n, V: cm3, solidFromVessel: false }
+    }
+    const from = this.vessel(src.vesselId)
+    if (from.wet) {
+      const V = Math.min(from.V, cm3)
+      const moved = from.takeFraction(V / from.V, true)
+      return { ...moved, solidFromVessel: false }
+    }
+    // tipping a dry solid out of a tube
+    const total = this.solidMass(from)
+    if (total <= 0) return { n: new Map(), V: 0, solidFromVessel: true }
+    const grams = Math.min(total, cm3 * 0.35)
+    const moved = from.takeFraction(grams / total, true)
+    moved.V = 0
+    return { ...moved, solidFromVessel: true }
+  }
+
+  private receiveInto(a: OpenAction, dest: Vessel, n: Map<string, number>, V: number) {
+    if (V > 0 && !dest.wet && [...dest.n.keys()].some((id) => SPECIES[id]?.phase === 's')) a.dissolving = true
+    for (const [id, amt] of n) {
+      a.addedAmounts.set(id, (a.addedAmounts.get(id) ?? 0) + amt)
+      if (SPECIES[id]?.phase === 's') this.markAdded(dest, id)
+    }
+    dest.receive(n, V)
+    if (dest.V > dest.spec.capacity) {
+      dest.takeFraction((dest.V - dest.spec.capacity) / dest.V, true)
+      dest.log.push({ kind: 'overflow', amount: 0, time: this.time })
+    }
+    dest.settled *= 0.7
+    dest.settle(this.time)
+    a.tracker.update(snapshot(dest))
+  }
+
+  /** Pour part of a source into the vessel of an open action. Returns the volume (cm³) or mass (g) moved. */
+  pourStep(a: OpenAction, src: Source, cm3: number): number {
+    const dest = this.vessel(a.vesselId)
+    const { n, V, solidFromVessel } = this.take(src, cm3)
+    this.receiveInto(a, dest, n, V)
+    if (!solidFromVessel) return V
+    let g = 0
+    for (const [id, amt] of n) g += (amt / 1000) * molarMassOf(id)
+    return g
+  }
+
+  /** Drops from a dropper bottle. */
+  dropStep(a: OpenAction, reagentId: string, drops = 1) {
+    return this.pourStep(a, { reagentId }, drops * DROP_VOLUME)
+  }
+
+  /** A spatula measure of solid from a vessel (dry contents only) or a solid reagent. Nothing is recorded. */
+  scoop(src: Source, grams: number): Map<string, number> {
+    if ('reagentId' in src) {
+      const r = REAGENTS[src.reagentId]
+      if (!r?.compound) return new Map()
+      const g = r.kind === 'piece' ? (r.pieceGrams ?? 0.05) : grams
+      return new Map([[compoundSpecies(r.compound), (g / COMPOUNDS[r.compound].molarMass) * 1000]])
+    }
+    const from = this.vessel(src.vesselId)
+    if (from.wet) return new Map()
+    const total = this.solidMass(from)
+    if (total <= 0) return new Map()
+    const moved = from.takeFraction(Math.min(1, grams / total), true).n
+    for (const id of moved.keys()) if (!this.added.get(from.id)?.has(id)) this.added.get(from.id)?.add(id)
+    return moved
+  }
+
+  /** Tip solid (from a spatula, or a piece of metal) into the vessel of an open action. */
+  deposit(a: OpenAction, n: Map<string, number>) {
+    this.receiveInto(a, this.vessel(a.vesselId), n, 0)
+  }
+
+  /**
+   * Pour through a filter paper sitting in a funnel above the action's vessel: solids stay on the
+   * paper (a vessel of kind 'filter-paper'), the liquid runs through into the vessel below.
+   */
+  filterStep(a: OpenAction, src: Source, paperId: string, cm3: number): number {
+    const paper = this.vessel(paperId)
+    const dest = this.vessel(a.vesselId)
+    const { n, V } = this.take(src, cm3)
+    for (const id of n.keys()) if (SPECIES[id]?.phase === 's') this.markAdded(paper, id)
+    paper.receive(n, V)
+    paper.settle(this.time)
+    paper.settled = 1
+    if (paper.V > 0.3) {
+      const drained = paper.takeFraction((paper.V - 0.3) / paper.V, false)
+      this.receiveInto(a, dest, drained.n, drained.V)
+    } else a.tracker.update(snapshot(dest))
+    if (!a.finalize) {
+      a.finalize = (obs) => {
+        const desc = drySolidDescription(paper)
+        const out: Observation[] = [{ kind: 'filtrate', text: `The filtrate is ${dest.wet ? snapshot(dest).solution.name : 'absent'}.` }]
+        out.push({ kind: 'residue', text: desc ? `${cap(desc.name)} residue on the filter paper.` : 'No residue on the filter paper.' })
+        return out.concat(obs.filter((o) => o.kind === 'effervescence' || o.kind === 'gas'))
+      }
+    }
+    return V
+  }
+
+  /** Heat a vessel (or stop heating it). Time passes with tick(). */
+  setHeating(vesselId: string, mode: HeatMode | null) {
+    this.vessel(vesselId).startHeating(mode)
+  }
+
+  /** Shake the tube (the change is written up after a few seconds). */
+  agitate(vesselId: string) {
+    const v = this.vessel(vesselId)
+    const a = this.begin(v.id, 'Shake the tube')
+    v.settled = 0
+    this.release(a, undefined, 3)
+  }
+
+  /** Hold a piece of test paper or a splint at the mouth of the tube; recorded, no time passes. */
+  mouthTest(vesselId: string, test: GasTest, opts: { damp?: boolean } = {}): ActionResult {
+    const v = this.vessel(vesselId)
+    const paper = test === 'damp-red-litmus' || test === 'damp-blue-litmus' || test === 'damp-universal-indicator'
+    const label = paper && opts.damp === false ? GAS_TEST_LABELS[test].replace('damp ', 'dry ') : GAS_TEST_LABELS[test]
+    const text = paper && opts.damp === false ? `No change – the dry ${label.replace(/^dry /, '')} does not change colour.` : this.gasReading(v.id, test)
+    return this.record({ vesselId: v.id, action: `Hold ${label} at the mouth of the tube`, observations: [{ kind: 'gas-test', text }], time: this.time })
+  }
+
+  /** Dip a strip of indicator paper into the contents of a tube. */
+  indicatorDip(vesselId: string, paper: IndicatorPaper): ActionResult {
+    const v = this.vessel(vesselId)
+    const name = paper === 'red-litmus' ? 'red litmus paper' : paper === 'blue-litmus' ? 'blue litmus paper' : 'universal indicator paper'
+    let text: string
+    if (!v.wet) text = `No change – there is no solution for the ${name} to test.`
+    else {
+      const pH = estimatePH(v)
+      if (paper === 'red-litmus') text = pH > 8 ? 'The red litmus paper turns blue.' : 'No change – the red litmus paper stays red.'
+      else if (paper === 'blue-litmus') text = pH < 6 ? 'The blue litmus paper turns red.' : 'No change – the blue litmus paper stays blue.'
+      else {
+        const r = Math.round(pH)
+        text = `Universal indicator paper turns ${indicatorColour(r)}: pH ≈ ${r}.`
+      }
+    }
+    return this.record({ vesselId: v.id, action: `Dip ${name} into the contents of the tube`, observations: [{ kind: 'pH', text }], time: this.time })
+  }
+
+  /** Squeeze a teat pipette at the mouth of the tube and draw in the gas there. Nothing is recorded. */
+  collectGas(vesselId: string): Map<string, number> {
+    const v = this.vessel(vesselId)
+    const out = new Map<string, number>()
+    for (const [g, amt] of v.headspace) {
+      const take = amt * 0.7
+      if (take < 1e-6) continue
+      out.set(g, take)
+      v.headspace.set(g, amt - take)
+    }
+    // soluble gases above a warm solution
+    const nh3 = (vapourPressure(v, 'NH3') / 0.0025) * 0.0061
+    const so2 = (vapourPressure(v, 'SO2(aq)') / 0.004) * 0.0061
+    if (nh3 > (out.get('NH3(g)') ?? 0)) out.set('NH3(g)', nh3)
+    if (so2 > (out.get('SO2(g)') ?? 0)) out.set('SO2(g)', so2)
+    return out
+  }
+
+  /** Bubble a gas sample (from collectGas) through the liquid in a tube, e.g. limewater. */
+  bubbleGas(sample: Map<string, number>, vesselId: string): ActionResult | undefined {
+    const v = this.vessel(vesselId)
+    if (!v.wet) return undefined
+    const limewater = v.amount('Ca2+') > 0 && v.amount('OH-') > 0
+    const a = this.begin(v.id, limewater ? 'Bubble the gas from the teat pipette through the limewater' : 'Bubble the gas from the teat pipette through the liquid')
+    const DISSOLVES: Record<string, string> = { 'CO2(g)': 'CO2(aq)', 'SO2(g)': 'SO2(aq)', 'NH3(g)': 'NH3', 'HCl(g)': 'HCl' }
+    const n = new Map<string, number>()
+    for (const [g, amt] of sample) {
+      if (g === 'HCl(g)') {
+        n.set('H+', (n.get('H+') ?? 0) + amt)
+        n.set('Cl-', (n.get('Cl-') ?? 0) + amt)
+      } else if (DISSOLVES[g]) n.set(DISSOLVES[g], (n.get(DISSOLVES[g]) ?? 0) + amt)
+    }
+    v.bubbleRate += 0.02
+    this.receiveInto(a, v, n, 0)
+    if (limewater) {
+      a.finalize = (obs) =>
+        obs.some((o) => o.kind === 'ppt' && /precipitate/.test(o.text))
+          ? [{ kind: 'gas-test', text: 'The limewater turns milky (white precipitate).' }]
+          : [{ kind: 'gas-test', text: 'No change – the limewater stays clear.' }]
+    }
+    return this.release(a, undefined, 0)
+  }
+
+  /** Record an observation made without changing anything (e.g. a flame test on a loaded wire). */
+  note(vesselId: string | undefined, action: string, text: string, kind = 'note'): ActionResult {
+    return this.record({ vesselId, action, observations: [{ kind, text }], time: this.time })
   }
 }
 
