@@ -14,7 +14,7 @@ How Qualitative Analysis Lab is built, how the chemistry engine works, and how t
 6. [Adding reagents, compounds, species and reactions](#6-adding-reagents-compounds-species-and-reactions)
 7. [Testing](#7-testing)
 8. [The user interface](#8-the-user-interface)
-9. [Building and deploying](#9-building-and-deploying)
+9. [Building](#9-building)
 10. [Conventions](#10-conventions)
 
 ## 1. Setup and commands
@@ -294,11 +294,9 @@ Write a procedure test whenever you fix a behaviour caused by an operation order
 - `storage.ts` stores answers, notes, marks and preferences under the `qa-lab:` prefix; every access is wrapped in `try/catch` so the app works when storage is unavailable.
 - The UI language is English (matching the exam).
 
-## 9. Building and deploying
+## 9. Building
 
 `npm run build` writes a static site to `dist/`. `vite.config.ts` sets `base: './'`, so the files work from any sub-path or even from a local folder served by a static server.
-
-The repository is private because the app contains Cambridge question papers, mark schemes and confidential instructions. **Do not deploy to an open URL** — GitHub Pages sites are public even for private repositories (except with Enterprise access control). Use local / intranet hosting or a static host with authentication.
 
 ## 10. Conventions
 

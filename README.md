@@ -6,8 +6,6 @@ A browser-based simulator for the qualitative-analysis question of Cambridge pra
 
 Unlike an "Alternative to Practical" worksheet, nothing is scripted: every tube holds its actual contents, and what you see comes from a chemistry engine that reacts to exactly what you did — including mistakes.
 
-> **Private repository.** This repository contains Cambridge question papers, mark schemes and confidential instructions for private study. Do not make the repository public or deploy the app to a public URL (see [Deployment](#deployment)).
-
 ## Features
 
 - **Real past papers** — 7 questions from 2023–2025 (4 × IGCSE 0620, 3 × 9701), with the original wording, the unknowns made up as in the confidential instructions, and the mark schemes.
@@ -80,15 +78,6 @@ docs/                   User and developer guides (English and Simplified Chines
 ```
 
 Tech stack: Vite 5, React 18, TypeScript 5 (strict), Vitest 2. No backend.
-
-## Deployment
-
-`npm run build` produces a fully static site in `dist/` with relative asset paths (`base: './'`), so it can be served from any sub-path.
-
-Because the app contains Cambridge question papers and mark schemes, **do not publish it on an open URL** such as GitHub Pages (a Pages site is public even when the repository is private). Suitable options:
-
-- run it locally (`npm run dev`, or `npm run build && npm run preview`) or on a school intranet;
-- a static host with access control (password or single sign-on).
 
 ## Research material
 
