@@ -86,6 +86,22 @@ r({ id: 'dissolve:CrAlum-green(s)', type: 'complete', priority: 0, reactants: { 
 r({ id: 'dissolve:FeAlum-melt(s)', type: 'complete', priority: 0, reactants: { 'FeAlum-melt(s)': 1 }, products: { 'NH4+': 1, 'Fe3+': 1, 'SO4 2-': 2 } })
 r({ id: 'dissolve:NH4Cl-sublimate(s)', type: 'complete', priority: 0, reactants: { 'NH4Cl-sublimate(s)': 1 }, products: { 'NH4+': 1, 'Cl-': 1 } })
 r({ id: 'dissolve:K2MnO4(s)', type: 'complete', priority: 0, reactants: { 'K2MnO4(s)': 1 }, products: { 'K+': 2, 'MnO4 2-': 1 } })
+const RESIDUE_IONS: Record<string, Stoich> = {
+  'Na2S2O3(s)': { 'Na+': 2, 'S2O3 2-': 1 },
+  'NH4Br-sublimate(s)': { 'NH4+': 1, 'Br-': 1 },
+  'NH4HSO4(s)': { 'NH4+': 1, 'H+': 1, 'SO4 2-': 1 },
+  'MgSO4(s)': { 'Mg2+': 1, 'SO4 2-': 1 },
+  'MgCl2(s)': { 'Mg2+': 1, 'Cl-': 2 },
+  'Ca(NO3)2(s)': { 'Ca2+': 1, 'NO3-': 2 },
+  'Al2(SO4)3(s)': { 'Al3+': 2, 'SO4 2-': 3 },
+  'KAl(SO4)2(s)': { 'K+': 1, 'Al3+': 1, 'SO4 2-': 2 },
+  'CrCl3(s)': { 'Cr3+': 1, 'Cl-': 3 },
+  'MnSO4(s)': { 'Mn2+': 1, 'SO4 2-': 1 },
+  'NiSO4(s)': { 'Ni2+': 1, 'SO4 2-': 1 },
+  'CuCl2(s)': { 'Cu2+': 1, 'Cl-': 2 },
+  'ZnSO4(s)': { 'Zn2+': 1, 'SO4 2-': 1 },
+}
+for (const [sp, ions] of Object.entries(RESIDUE_IONS)) r({ id: `dissolve:${sp}`, type: 'complete', priority: 0, reactants: { [sp]: 1 }, products: ions })
 
 // ======================================================================= acid–base (complete)
 r({ id: 'neutralise', type: 'complete', priority: 1, reactants: { 'H+': 1, 'OH-': 1 }, products: {} })

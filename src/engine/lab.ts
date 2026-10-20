@@ -1,6 +1,7 @@
 // The laboratory: vessels, samples, reagents, a clock and the actions a candidate can take.
 // Every action returns exam-style observations derived from the change in state.
 
+import { appearance, type Appearance } from './appearance'
 import { COMPOUNDS, compoundSpecies } from './compounds'
 import { describe, snapshot, Tracker, cap, drySolidDescription, type Observation } from './observe'
 import { REAGENTS, type ReagentDef } from './reagents'
@@ -55,9 +56,17 @@ export interface ActionResult {
   action: string
   observations: Observation[]
   time: number
+  /** how the vessel looked during the action, for step-by-step playback (not kept in the journal) */
+  frames?: Frame[]
 }
 
-export interface JournalEntry extends ActionResult {
+export interface Frame {
+  /** seconds since the start of the action */
+  t: number
+  a: Appearance
+}
+
+export interface JournalEntry extends Omit<ActionResult, 'frames'> {
   vesselLabel?: string
 }
 
@@ -164,6 +173,7 @@ export class Lab {
     const hasSolid = [...n.keys()].some((id) => SPECIES[id]?.phase === 's')
     const seconds = opts.seconds ?? Math.max(hasSolid ? 4 : 1, Math.min(6, 1 + steps * 0.4))
     const dt = seconds / steps
+    const frames: Frame[] = [{ t: 0, a: appearance(dest) }]
     for (let i = 0; i < steps; i++) {
       const part = new Map<string, number>()
       for (const [id, amt] of n) part.set(id, amt / steps)
@@ -171,6 +181,7 @@ export class Lab {
       dest.settle(this.time)
       dest.advance(dt, this.time)
       tracker.update(snapshot(dest))
+      frames.push({ t: (i + 1) * dt, a: appearance(dest) })
     }
     if (dest.V > dest.spec.capacity) {
       dest.takeFraction((dest.V - dest.spec.capacity) / dest.V, true)
@@ -184,12 +195,13 @@ export class Lab {
       addedAmounts: n,
       beforeAmounts,
     })
-    return this.record({ vesselId: dest.id, action: label, observations, time: this.time })
+    return this.record({ vesselId: dest.id, action: label, observations, time: this.time, frames })
   }
 
   private record(r: ActionResult): ActionResult {
     const v = r.vesselId ? this.vessels.get(r.vesselId) : undefined
-    this.journal.push({ ...r, vesselLabel: v?.label })
+    const { frames: _frames, ...entry } = r
+    this.journal.push({ ...entry, vesselLabel: v?.label })
     return r
   }
 
@@ -284,6 +296,7 @@ export class Lab {
     const tracker = new Tracker(before)
     const mark = v.log.length
     v.startHeating(mode)
+    const frames: Frame[] = [{ t: 0, a: appearance(v) }]
     const step = 2
     let t = 0
     while (t < seconds) {
@@ -291,13 +304,14 @@ export class Lab {
       v.advance(h, this.time + t)
       tracker.update(snapshot(v))
       t += h
+      frames.push({ t, a: appearance(v) })
     }
     v.startHeating(null)
     this.elapse(seconds, v)
     const label =
       mode === 'warm' ? 'Warm gently' : mode === 'boil' ? 'Heat to boiling' : mode === 'gentle' ? 'Heat gently' : 'Heat strongly'
     const obs = describe(v, before, tracker, v.log.slice(mark), this.added.get(v.id)!, { heating: !v.wet, seconds, beforeDryName })
-    return this.record({ vesselId: v.id, action: `${label} for ${seconds} s`, observations: obs, time: this.time })
+    return this.record({ vesselId: v.id, action: `${label} for ${seconds} s`, observations: obs, time: this.time, frames })
   }
 
   /** Let time pass (all vessels). Observations are reported for `vesselId` if given. */
@@ -307,13 +321,17 @@ export class Lab {
     const tracker = before ? new Tracker(before) : undefined
     const mark = v?.log.length ?? 0
     const wasHot = v ? v.T > 150 && !v.wet : false
+    const frames: Frame[] = v ? [{ t: 0, a: appearance(v) }] : []
     let t = 0
     while (t < seconds) {
       const h = Math.min(10, seconds - t)
       for (const x of this.vessels.values()) x.advance(h, this.time)
       this.time += h
       t += h
-      if (v && tracker) tracker.update(snapshot(v))
+      if (v && tracker) {
+        tracker.update(snapshot(v))
+        frames.push({ t, a: appearance(v) })
+      }
     }
     let observations: Observation[] = []
     if (v && before && tracker) {
@@ -323,7 +341,7 @@ export class Lab {
         if (dry) observations = observations.filter((o) => o.kind !== 'none').concat({ kind: 'residue', text: `On cooling, the solid is ${dry.name}.` })
       }
     }
-    return this.record({ vesselId: v?.id, action: `Leave to stand for ${seconds} s`, observations, time: this.time })
+    return this.record({ vesselId: v?.id, action: `Leave to stand for ${seconds} s`, observations, time: this.time, frames: v ? frames : undefined })
   }
 
   shake(vesselId: string): ActionResult {

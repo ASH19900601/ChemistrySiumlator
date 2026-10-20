@@ -73,7 +73,7 @@ c({ id: 'Na2S2O5', formula: 'Na₂S₂O₅', name: 'sodium metabisulfite', molar
   dissolves: { 'Na+': 2, 'SO3 2-': 2, 'H+': 2 } })
 c({ id: 'Na2S2O3.5H2O', formula: 'Na₂S₂O₃·5H₂O', name: 'sodium thiosulfate', molarMass: 248.2, colour: '#fafafa', colourName: 'white',
   dissolves: { 'Na+': 2, 'S2O3 2-': 1 },
-  thermal: [{ minTemp: 60, halfLife: 10, products: { ...W(5) }, events: ['melts in its own water of crystallisation', ...hydrateEvents] }] })
+  thermal: [{ minTemp: 60, halfLife: 10, products: { 'Na2S2O3(s)': 1, ...W(5) }, events: ['melts in its own water of crystallisation', ...hydrateEvents] }] })
 c({ id: 'Na2CO3', formula: 'Na₂CO₃', name: 'anhydrous sodium carbonate', molarMass: 106.0, colour: '#fafafa', colourName: 'white',
   dissolves: { 'Na+': 2, 'CO3 2-': 1 } })
 c({ id: 'Na2CO3.10H2O', formula: 'Na₂CO₃·10H₂O', name: 'hydrated sodium carbonate', molarMass: 286.1, colour: '#fafafa', colourName: 'white',
@@ -94,13 +94,13 @@ c({ id: 'NH4Cl', formula: 'NH₄Cl', name: 'ammonium chloride', molarMass: 53.49
     events: ['white solid sublimes and collects on the cooler part of the tube', 'white fumes'] }] })
 c({ id: 'NH4Br', formula: 'NH₄Br', name: 'ammonium bromide', molarMass: 97.94, colour: '#fafafa', colourName: 'white',
   dissolves: { 'NH4+': 1, 'Br-': 1 },
-  thermal: [{ minTemp: 300, halfLife: 15, products: { 'NH3(g)': 0.2 }, events: ['white solid sublimes and collects on the cooler part of the tube', 'white fumes'] }] })
+  thermal: [{ minTemp: 300, halfLife: 15, products: { 'NH4Br-sublimate(s)': 1 }, events: ['white solid sublimes and collects on the cooler part of the tube', 'white fumes'] }] })
 c({ id: 'NH4NO3', formula: 'NH₄NO₃', name: 'ammonium nitrate', molarMass: 80.04, colour: '#fafafa', colourName: 'white',
   dissolves: { 'NH4+': 1, 'NO3-': 1 },
   thermal: [{ minTemp: 170, halfLife: 20, products: { ...W(2) }, events: ['melts', 'colourless gas given off', ...hydrateEvents] }] })
 c({ id: '(NH4)2SO4', formula: '(NH₄)₂SO₄', name: 'ammonium sulfate', molarMass: 132.1, colour: '#fafafa', colourName: 'white',
   dissolves: { 'NH4+': 2, 'SO4 2-': 1 },
-  thermal: [{ minTemp: 280, halfLife: 40, products: { 'NH3(g)': 1 }, events: ['melts', 'white fumes'] }] })
+  thermal: [{ minTemp: 280, halfLife: 40, products: { 'NH4HSO4(s)': 1, 'NH3(g)': 1 }, events: ['melts', 'white fumes'] }] })
 c({ id: '(NH4)2CO3', formula: '(NH₄)₂CO₃', name: 'ammonium carbonate', molarMass: 96.09, colour: '#fafafa', colourName: 'white',
   dissolves: { 'NH4+': 2, 'CO3 2-': 1 },
   thermal: [{ minTemp: 58, halfLife: 10, products: { 'NH3(g)': 2, 'CO2(g)': 1, ...W(1) }, events: ['solid disappears completely (no residue)', ...hydrateEvents] }] })
@@ -108,16 +108,16 @@ c({ id: '(NH4)2CO3', formula: '(NH₄)₂CO₃', name: 'ammonium carbonate', mol
 // ---------------------------------------------------------------- group 2 / Al
 c({ id: 'MgSO4.7H2O', formula: 'MgSO₄·7H₂O', name: 'magnesium sulfate', molarMass: 246.5, colour: '#fafafa', colourName: 'white',
   dissolves: { 'Mg2+': 1, 'SO4 2-': 1 },
-  thermal: [{ minTemp: 120, halfLife: 15, products: { ...W(7) }, events: hydrateEvents }] })
+  thermal: [{ minTemp: 120, halfLife: 15, products: { 'MgSO4(s)': 1, ...W(7) }, events: hydrateEvents }] })
 c({ id: 'MgCl2.6H2O', formula: 'MgCl₂·6H₂O', name: 'magnesium chloride', molarMass: 203.3, colour: '#fafafa', colourName: 'white',
   dissolves: { 'Mg2+': 1, 'Cl-': 2 },
-  thermal: [{ minTemp: 120, halfLife: 15, products: { 'HCl(g)': 0.3, ...W(6) }, events: hydrateEvents }] })
+  // partial hydrolysis: some HCl is lost and a little oxide remains
+  thermal: [{ minTemp: 120, halfLife: 15, products: { 'MgCl2(s)': 0.85, 'MgO(s)': 0.15, 'HCl(g)': 0.3, ...W(5.85) }, events: hydrateEvents }] })
 c({ id: 'CaCl2', formula: 'CaCl₂', name: 'calcium chloride', molarMass: 111.0, colour: '#fafafa', colourName: 'white',
   dissolves: { 'Ca2+': 1, 'Cl-': 2 } })
 c({ id: 'Ca(NO3)2.4H2O', formula: 'Ca(NO₃)₂·4H₂O', name: 'calcium nitrate', molarMass: 236.1, colour: '#fafafa', colourName: 'white',
   dissolves: { 'Ca2+': 1, 'NO3-': 2 },
-  thermal: [{ minTemp: 100, halfLife: 15, products: { ...W(4) }, events: ['melts', ...hydrateEvents] },
-    { minTemp: 500, halfLife: 40, products: { 'CaO(s)': 1, 'NO2(g)': 2, 'O2(g)': 0.5 }, events: ['brown gas given off'] }] })
+  thermal: [{ minTemp: 100, halfLife: 15, products: { 'Ca(NO3)2(s)': 1, ...W(4) }, events: ['melts', ...hydrateEvents] }] })
 c({ id: 'BaCl2.2H2O', formula: 'BaCl₂·2H₂O', name: 'hydrated barium chloride', molarMass: 244.3, colour: '#fafafa', colourName: 'white',
   dissolves: { 'Ba2+': 1, 'Cl-': 2 },
   thermal: [{ minTemp: 115, halfLife: 15, products: { 'BaCl2(s)': 1, ...W(2) }, events: ['crackles', ...hydrateEvents] }] })
@@ -125,13 +125,13 @@ c({ id: 'Ba(NO3)2', formula: 'Ba(NO₃)₂', name: 'barium nitrate', molarMass: 
   dissolves: { 'Ba2+': 1, 'NO3-': 2 } })
 c({ id: 'Al2(SO4)3.16H2O', formula: 'Al₂(SO₄)₃·16H₂O', name: 'aluminium sulfate', molarMass: 630.4, colour: '#fafafa', colourName: 'white',
   dissolves: { 'Al3+': 2, 'SO4 2-': 3 },
-  thermal: [{ minTemp: 90, halfLife: 15, products: { ...W(16) }, events: ['melts in its own water of crystallisation', ...hydrateEvents] }] })
+  thermal: [{ minTemp: 90, halfLife: 15, products: { 'Al2(SO4)3(s)': 1, ...W(16) }, events: ['melts in its own water of crystallisation', ...hydrateEvents] }] })
 c({ id: 'KAl(SO4)2.12H2O', formula: 'KAl(SO₄)₂·12H₂O', name: 'potassium aluminium sulfate (alum)', molarMass: 474.4, colour: '#fafafa', colourName: 'white',
   dissolves: { 'K+': 1, 'Al3+': 1, 'SO4 2-': 2 },
-  thermal: [{ minTemp: 90, halfLife: 15, products: { ...W(12) }, events: ['melts in its own water of crystallisation', ...hydrateEvents] }] })
+  thermal: [{ minTemp: 90, halfLife: 15, products: { 'KAl(SO4)2(s)': 1, ...W(12) }, events: ['melts in its own water of crystallisation', ...hydrateEvents] }] })
 c({ id: 'AlCl3.6H2O', formula: 'AlCl₃·6H₂O', name: 'aluminium chloride', molarMass: 241.4, colour: '#fafafa', colourName: 'white',
   dissolves: { 'Al3+': 1, 'Cl-': 3 },
-  thermal: [{ minTemp: 100, halfLife: 15, products: { 'HCl(g)': 1, ...W(6) }, events: ['white fumes', ...hydrateEvents] }] })
+  thermal: [{ minTemp: 100, halfLife: 15, products: { 'Al2O3(s)': 0.5, 'HCl(g)': 3, ...W(4.5) }, events: ['white fumes', ...hydrateEvents] }] })
 
 // ---------------------------------------------------------------- transition metals
 c({ id: 'KCr(SO4)2.12H2O', formula: 'KCr(SO₄)₂·12H₂O', name: 'chrome alum', molarMass: 499.4, colour: '#3c2648', colourName: 'dark purple',
@@ -140,10 +140,10 @@ c({ id: 'KCr(SO4)2.12H2O', formula: 'KCr(SO₄)₂·12H₂O', name: 'chrome alum
     events: ['melts in its own water of crystallisation', 'turns green', ...hydrateEvents] }] })
 c({ id: 'CrCl3.6H2O', formula: 'CrCl₃·6H₂O', name: 'chromium(III) chloride', molarMass: 266.4, colour: '#2f5a2c', colourName: 'dark green',
   dissolves: { 'Cr3+': 1, 'Cl-': 3 },
-  thermal: [{ minTemp: 100, halfLife: 15, products: { ...W(6) }, events: hydrateEvents }] })
+  thermal: [{ minTemp: 100, halfLife: 15, products: { 'CrCl3(s)': 1, ...W(6) }, events: hydrateEvents }] })
 c({ id: 'MnSO4.4H2O', formula: 'MnSO₄·4H₂O', name: 'manganese(II) sulfate', molarMass: 223.1, colour: '#f2dfe4', colourName: 'very pale pink',
   dissolves: { 'Mn2+': 1, 'SO4 2-': 1 },
-  thermal: [{ minTemp: 120, halfLife: 15, products: { ...W(4) }, events: hydrateEvents }] })
+  thermal: [{ minTemp: 120, halfLife: 15, products: { 'MnSO4(s)': 1, ...W(4) }, events: hydrateEvents }] })
 c({ id: 'MnCl2.4H2O', formula: 'MnCl₂·4H₂O', name: 'manganese(II) chloride', molarMass: 197.9, colour: '#f0d4dc', colourName: 'pale pink',
   dissolves: { 'Mn2+': 1, 'Cl-': 2 } })
 c({ id: 'FeSO4.7H2O', formula: 'FeSO₄·7H₂O', name: 'iron(II) sulfate', molarMass: 278.0, colour: '#b5d9b0', colourName: 'pale green',
@@ -166,19 +166,19 @@ c({ id: 'CoCl2.6H2O', formula: 'CoCl₂·6H₂O', name: 'cobalt(II) chloride', m
   thermal: [{ minTemp: 110, halfLife: 15, products: { 'CoCl2(s)': 1, ...W(6) }, events: ['turns blue', ...hydrateEvents] }] })
 c({ id: 'NiSO4.6H2O', formula: 'NiSO₄·6H₂O', name: 'nickel(II) sulfate', molarMass: 262.9, colour: '#4fa36a', colourName: 'green',
   dissolves: { 'Ni2+': 1, 'SO4 2-': 1 },
-  thermal: [{ minTemp: 110, halfLife: 15, products: { ...W(6) }, events: hydrateEvents }] })
+  thermal: [{ minTemp: 110, halfLife: 15, products: { 'NiSO4(s)': 1, ...W(6) }, events: ['green solid turns yellow', ...hydrateEvents] }] })
 c({ id: 'CuSO4.5H2O', formula: 'CuSO₄·5H₂O', name: 'copper(II) sulfate', molarMass: 249.7, colour: '#2f74c8', colourName: 'blue',
   dissolves: { 'Cu2+': 1, 'SO4 2-': 1 },
   thermal: [{ minTemp: 110, halfLife: 15, products: { 'CuSO4(s)': 1, ...W(5) }, events: ['blue solid turns white', ...hydrateEvents] }] })
 c({ id: 'CuCl2.2H2O', formula: 'CuCl₂·2H₂O', name: 'copper(II) chloride', molarMass: 170.5, colour: '#3fa59a', colourName: 'blue-green',
   dissolves: { 'Cu2+': 1, 'Cl-': 2 },
-  thermal: [{ minTemp: 110, halfLife: 15, products: { ...W(2) }, events: ['turns yellow-brown', ...hydrateEvents] }] })
+  thermal: [{ minTemp: 110, halfLife: 15, products: { 'CuCl2(s)': 1, ...W(2) }, events: ['turns yellow-brown', ...hydrateEvents] }] })
 c({ id: 'Cu(NO3)2.3H2O', formula: 'Cu(NO₃)₂·3H₂O', name: 'copper(II) nitrate', molarMass: 241.6, colour: '#2f6fc0', colourName: 'blue',
   dissolves: { 'Cu2+': 1, 'NO3-': 2 },
   thermal: [{ minTemp: 120, halfLife: 20, products: { 'CuO(s)': 1, 'NO2(g)': 2, 'O2(g)': 0.5, ...W(3) }, events: ['melts', 'brown gas given off', ...hydrateEvents] }] })
 c({ id: 'ZnSO4.7H2O', formula: 'ZnSO₄·7H₂O', name: 'zinc sulfate', molarMass: 287.6, colour: '#fafafa', colourName: 'white',
   dissolves: { 'Zn2+': 1, 'SO4 2-': 1 },
-  thermal: [{ minTemp: 100, halfLife: 15, products: { ...W(7) }, events: hydrateEvents }] })
+  thermal: [{ minTemp: 100, halfLife: 15, products: { 'ZnSO4(s)': 1, ...W(7) }, events: hydrateEvents }] })
 c({ id: 'ZnCl2', formula: 'ZnCl₂', name: 'zinc chloride', molarMass: 136.3, colour: '#fafafa', colourName: 'white',
   dissolves: { 'Zn2+': 1, 'Cl-': 2 } })
 c({ id: 'Zn(NO3)2.6H2O', formula: 'Zn(NO₃)₂·6H₂O', name: 'zinc nitrate', molarMass: 297.5, colour: '#fafafa', colourName: 'white',
@@ -250,6 +250,8 @@ export const SOLID_THERMAL: Record<string, ThermalStep[]> = {
   'CrAlum-green(s)': [],
   'FeAlum-melt(s)': [{ minTemp: 400, halfLife: 30, products: { 'Fe2O3(s)': 0.5, 'NH3(g)': 0.5, 'SO3(g)': 1 }, events: ['residue turns red-brown', 'white fumes'] }],
   'K2MnO4(s)': [],
+  'Ca(NO3)2(s)': [{ minTemp: 500, halfLife: 40, products: { 'CaO(s)': 1, 'NO2(g)': 2, 'O2(g)': 0.5 }, events: ['brown gas given off'] }],
+  'NH4HSO4(s)': [{ minTemp: 450, halfLife: 60, products: { 'NH3(g)': 1, 'SO3(g)': 1, ...W(1) }, events: ['white fumes'] }],
 }
 
 /** Special mixed-solid behaviour: iodides heated with zinc carbonate release a little iodine vapour. */

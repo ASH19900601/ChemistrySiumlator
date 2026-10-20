@@ -116,7 +116,7 @@ interface Rule {
 
 `Vessel.settle()` 反复扫描快反应（`FAST_RULES`，按优先级排序），直到不再变化（最多 300 轮）。每轮中优先级高的规则先执行，因此加入的 NaOH 会先中和游离酸（优先级 1），之后才会沉淀金属氢氧化物（优先级 3）。低于显著性阈值的变化会被忽略，以避免振荡。
 
-`Vessel.advance(dt)` 以 1–4 秒为步长推进时间：温度向室温（或加热目标：warm 65 °C、boil 100 °C、gentle 260 °C、strong 600 °C）靠近，动力学规则推进，快反应重新求解，挥发性气体逸出。
+`Vessel.advance(dt)` 以 1–4 秒为步长推进时间：温度向室温（或加热目标：warm 65 °C、boil 100 °C、gentle 260 °C、strong 600 °C；加热至沸腾的液体约 35 秒达到 100 °C，之后水分蒸发，直至蒸干）靠近，动力学规则推进，快反应重新求解，挥发性气体逸出。
 
 ### 3.4 气体
 
@@ -154,7 +154,7 @@ for (let i = 0; i < 5; i++) console.log(lab.addReagent(t.id, 'NH3', { drops: 1 }
 console.log(lab.addReagent(t.id, 'NH3', { cm3: 4 }).observations)   // 深蓝色溶液
 ```
 
-`Lab` 的主要方法（均返回带 `observations` 的 `ActionResult`，并追加到 `lab.journal`）：
+`Lab` 的主要方法（均返回带 `observations` 的 `ActionResult`——加试剂、加热和静置还带 `frames`——并追加到 `lab.journal`）：
 
 | 方法 | 用途 |
 |---|---|
@@ -287,7 +287,7 @@ r({ id: 'ClO+H+Cl', type: 'kinetic', reactants: { 'ClO-': 1, 'Cl-': 1, 'H+': 2 }
 ## 8. 用户界面
 
 - `App.tsx` 保存画面状态（`home`／`exam`／`results`）。每次作答都会挂载一个新的 `Exam` 和新的 `Lab`。
-- `Exam.tsx` 每 2 秒调用一次 `lab.tick(2)`，让实验台上的时间流逝。操作通过 `run()` 执行：先播放简短动画（倒液、加热、检验气体）再执行操作，忙碌期间忽略输入。试管架最多 18 个容器。
+- `Exam.tsx` 每 2 秒调用一次 `lab.tick(2)`，让实验台上的时间流逝。操作通过 `run()` 执行：引擎一次算完整个操作，并返回 `frames`（加试剂、加热或静置时每一步的容器外观 `Appearance`）；界面先在实验台和滴管预览中回放这些画面（1–4.5 秒），再显示结果。因此短暂出现的变化（例如生成后又溶解的沉淀）也看得见。回放期间忽略输入。试管架最多 18 个容器。
 - 除非打开 *Observation text* 开关，否则隐藏观察文字；画面（`Tube.tsx`、`ResultVisual.tsx`）总是显示。
 - 玻璃仪器使用 SVG：液体使用 multiply 混合，沉淀和浑浊使用噪声滤镜（`Tube.tsx` 中的 `SvgDefs`），气泡使用 CSS 动画。
 - 布局（`styles.css`）：宽度 ≥ 1100 px（电脑、iPad 横屏）＝左边实验台、右边试卷／笔记；≤ 1099 px＝每次显示一个面板，底部有标签（Lab / Paper / Notebook）；竖屏的高平板（宽 700–1099 px、高 ≥ 960 px，如 iPad）＝上方实验台、下方试卷；≤ 640 px＝手机紧凑尺寸。所有尺寸下对话框都是底部弹出面板。

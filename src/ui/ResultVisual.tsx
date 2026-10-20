@@ -76,7 +76,7 @@ export function ResultVisual({ result }: { result: ActionResult }) {
   if (a.includes('glowing splint') || a.includes('lighted splint')) {
     const glowing = a.includes('glowing')
     const relit = /relights/.test(text)
-    const pop = /pop/.test(text)
+    const pop = /squeaky pop/.test(text)
     const out = /goes out|extinguished/.test(text)
     return (
       <svg viewBox="0 0 80 110" className="result-visual" aria-hidden>

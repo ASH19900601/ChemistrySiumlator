@@ -184,7 +184,10 @@ export function describe(
   // ---- rule events (melts, crackles, ...)
   for (const e of events) if (e.kind === 'rule' && e.text && e.text !== 'condensation') push('event', `${cap(e.text)}.`)
   if (events.some((e) => e.kind === 'overflow')) push('overflow', 'The tube overflows – some of the mixture is lost.')
+  const boiled = events.filter((e) => e.kind === 'boil').reduce((s, e) => s + e.amount, 0)
   if (events.some((e) => e.kind === 'dry')) push('dry', 'The water boils away, leaving a residue.')
+  else if (boiled > 0.3) push('boil', 'The liquid boils and its volume decreases.')
+  else if (boiled > 0.02) push('boil', 'The liquid boils.')
 
   // ---- solids
   const ids = new Set([...Object.keys(before.solids), ...Object.keys(after.solids), ...Object.keys(tracker.max)])

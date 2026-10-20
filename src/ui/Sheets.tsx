@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { appearance, GAS_TEST_LABELS, REAGENTS, type Amount, type GasTest, type HeatMode, type Lab, type VesselKind } from '../engine'
+import { appearance, GAS_TEST_LABELS, REAGENTS, type Amount, type Appearance, type GasTest, type HeatMode, type Lab, type VesselKind } from '../engine'
 import { Tube } from './Tube'
 
 export function Sheet({ title, onClose, children, wide }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
@@ -52,6 +52,7 @@ export function ReagentSheet({
   onAdd,
   onClose,
   onPickVessel,
+  preview,
   feedback,
 }: {
   lab: Lab
@@ -60,6 +61,8 @@ export function ReagentSheet({
   onAdd: (vesselId: string, amount: Amount) => void
   onClose: () => void
   onPickVessel: (id: string | VesselKind) => void
+  /** appearance to show while an addition is being replayed */
+  preview?: Appearance
   feedback?: ReactNode
 }) {
   const r = REAGENTS[reagentId]
@@ -78,7 +81,7 @@ export function ReagentSheet({
     <Sheet title={`${r.label} → ${v.label}`} onClose={onClose} wide>
       <div className="dropper-layout">
         <div className="dropper-preview">
-          <Tube a={appearance(v)} id={`sheet-${v.id}`} big />
+          <Tube a={preview ?? appearance(v)} id={`sheet-${v.id}`} big />
         </div>
         <div className="dropper-controls">
           {r.kind === 'solution' ? (

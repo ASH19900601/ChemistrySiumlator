@@ -26,6 +26,8 @@ export const ROOM_T = 20
 
 export type HeatMode = 'warm' | 'boil' | 'gentle' | 'strong'
 const HEAT_TARGET: Record<HeatMode, number> = { warm: 65, boil: 100, gentle: 260, strong: 600 }
+/** effective flame temperature for a liquid being boiled (reaches 100 °C in about 35 s) */
+const BOIL_DRIVE = 125
 
 export interface EngineEvent {
   kind: 'rule' | 'gas' | 'condensation' | 'overflow' | 'boil' | 'dry'
@@ -214,13 +216,16 @@ export class Vessel {
   }
 
   private updateTemperature(h: number, time: number) {
-    const target = this.heating ? HEAT_TARGET[this.heating] : ROOM_T
+    let target = this.heating ? HEAT_TARGET[this.heating] : ROOM_T
+    // A flame hot enough to boil water drives the liquid above 100 °C; the clamp below then turns
+    // the excess heat into evaporation instead of leaving the temperature just short of 100 °C.
+    if (this.wet && target >= 100) target = Math.max(target, BOIL_DRIVE)
     const tau = this.heating ? (this.wet ? 25 : 12) : this.wet ? 70 : 45
     let T = this.T + (target - this.T) * (1 - Math.exp(-h / tau))
-    if (this.wet && T > 100) {
+    if (this.wet && T >= 100) {
       T = 100
       // boiling away water
-      const dV = Math.min(this.V, (this.heating === 'strong' ? 0.04 : 0.015) * h)
+      const dV = Math.min(this.V, (this.heating === 'boil' ? 0.02 : 0.04) * h)
       this.V -= dV
       if (dV > 0) this.log.push({ kind: 'boil', amount: dV, time })
       if (!this.wet) {

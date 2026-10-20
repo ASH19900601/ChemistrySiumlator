@@ -116,7 +116,7 @@ interface Rule {
 
 `Vessel.settle()` sweeps the fast rules (`FAST_RULES`, sorted by priority) repeatedly until nothing changes (max 300 sweeps). Within a sweep higher-priority rules act first, so added NaOH neutralises free acid (priority 1) before it can precipitate a metal hydroxide (priority 3). Changes below a significance threshold are ignored to avoid oscillation.
 
-`Vessel.advance(dt)` steps time in 1–4 s increments: temperature relaxes towards room temperature (or the heating target: warm 65 °C, boil 100 °C, gentle 260 °C, strong 600 °C), kinetic rules progress, the fast rules settle again, and volatile gases leave.
+`Vessel.advance(dt)` steps time in 1–4 s increments: temperature relaxes towards room temperature (or the heating target: warm 65 °C, boil 100 °C, gentle 260 °C, strong 600 °C; a liquid heated to boiling reaches 100 °C in about 35 s and then loses water by evaporation until it boils dry), kinetic rules progress, the fast rules settle again, and volatile gases leave.
 
 ### 3.4 Gases
 
@@ -154,7 +154,7 @@ for (let i = 0; i < 5; i++) console.log(lab.addReagent(t.id, 'NH3', { drops: 1 }
 console.log(lab.addReagent(t.id, 'NH3', { cm3: 4 }).observations)   // deep blue solution
 ```
 
-Main `Lab` methods (all return an `ActionResult` with `observations` and are appended to `lab.journal`):
+Main `Lab` methods (all return an `ActionResult` with `observations` — plus `frames` for additions, heating and standing — and are appended to `lab.journal`):
 
 | Method | Purpose |
 |---|---|
@@ -287,7 +287,7 @@ Write a procedure test whenever you fix a behaviour caused by an operation order
 ## 8. The user interface
 
 - `App.tsx` holds the screen state (`home` / `exam` / `results`). Each attempt mounts a fresh `Exam` with a new `Lab`.
-- `Exam.tsx` calls `lab.tick(2)` every 2 s so time passes on the bench. Actions run through `run()`, which shows a short animation (pouring, heating, gas test) before applying the action, and ignores input while busy. The rack is limited to 18 vessels.
+- `Exam.tsx` calls `lab.tick(2)` every 2 s so time passes on the bench. Actions run through `run()`: the engine computes the action in one go and returns `frames` (the vessel's `Appearance` at each step of an addition, heating or standing); the UI replays these frames on the bench and in the dropper preview (1–4.5 s), then shows the result. Short-lived changes such as a precipitate that forms and redissolves are therefore visible. Input is ignored while an action plays. The rack is limited to 18 vessels.
 - Observation text is hidden unless the *Observation text* switch is on; the picture (`Tube.tsx`, `ResultVisual.tsx`) is always shown.
 - Glassware is SVG: liquids use multiply blending, precipitates and turbidity use noise filters (`SvgDefs` in `Tube.tsx`), bubbles are CSS animations.
 - Layouts (`styles.css`): ≥ 1100 px (desktop, iPad landscape) = bench left, paper/notebook right; ≤ 1099 px = one pane at a time with bottom tabs (Lab / Paper / Notebook); tall tablets in portrait (700–1099 px wide, ≥ 960 px high, e.g. iPad) = bench above, paper below; ≤ 640 px = compact phone sizing. Dialogs are bottom sheets on every size.

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { appearance, Lab, REAGENTS, type ActionResult, type Amount, type GasTest, type HeatMode, type VesselKind } from '../engine'
+import { appearance, Lab, REAGENTS, type ActionResult, type Amount, type Appearance, type Frame, type GasTest, type HeatMode, type VesselKind } from '../engine'
 import type { PaperCase } from '../papers'
 import { ReagentBottle, ToolIcon, TOOL_LABELS, type ToolId } from './Apparatus'
 import { PaperPane, type Answers } from './PaperPane'
@@ -20,6 +20,23 @@ type Tab = 'lab' | 'paper' | 'notes'
 
 const MAX_VESSELS = 18
 
+/** How long (ms) to take replaying an action's frames on screen. */
+function playbackMs(kind: BusyKind, frames: Frame[]) {
+  const T = frames[frames.length - 1].t
+  const clamp = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x))
+  if (kind === 'heat') return clamp(T * 45, 1500, 4500)
+  if (kind === 'wait') return clamp(T * 10, 1200, 3500)
+  return clamp(frames.length * 90, 250, 1400)
+}
+
+interface Playback {
+  id: string
+  a: Appearance
+  /** simulated seconds into the action, and its total length */
+  t: number
+  total: number
+}
+
 export function Exam({ paper, onFinish, onExit }: { paper: PaperCase; onFinish: (answers: Answers, lab: Lab) => void; onExit: () => void }) {
   const labRef = useRef<Lab>()
   if (!labRef.current) labRef.current = new Lab({ samples: paper.samples, reagents: paper.reagents })
@@ -30,6 +47,9 @@ export function Exam({ paper, onFinish, onExit }: { paper: PaperCase; onFinish: 
   const [sheet, setSheet] = useState<SheetState | null>(null)
   const [busy, setBusy] = useState<{ id: string | null; kind: BusyKind } | null>(null)
   const busyRef = useRef(false)
+  const [play, setPlay] = useState<Playback | null>(null)
+  const rafRef = useRef(0)
+  useEffect(() => () => cancelAnimationFrame(rafRef.current), [])
   const [last, setLast] = useState<ActionResult | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   const [tab, setTab] = useState<Tab>('lab')
@@ -62,25 +82,59 @@ export function Exam({ paper, onFinish, onExit }: { paper: PaperCase; onFinish: 
     return () => clearTimeout(t)
   }, [toast])
 
+  // An action is computed in one go by the engine, which also records how the vessel looked at
+  // each step (frames). The frames are replayed on the bench before the result is shown, so
+  // short-lived changes – a precipitate that forms and dissolves again, a colour that comes and
+  // goes while heating – are seen, not just read about.
   const run = useCallback(
     (id: string | null, kind: BusyKind, fn: () => ActionResult | void, delay = 650) => {
       if (busyRef.current) return
       busyRef.current = true
       setBusy({ id, kind })
-      setTimeout(() => {
-        try {
-          const r = fn()
-          if (r) setLast(r)
-        } catch (e) {
-          setToast((e as Error).message)
-        }
+      const lead = Math.min(250, delay / 3)
+      const finish = (r?: ActionResult) => {
+        setPlay(null)
+        if (r) setLast(r)
         busyRef.current = false
         setBusy(null)
         bump()
-      }, delay)
+      }
+      setTimeout(() => {
+        let r: ActionResult | undefined
+        try {
+          r = fn() || undefined
+        } catch (e) {
+          setToast((e as Error).message)
+          return finish()
+        }
+        const frames = r?.frames
+        const vid = r?.vesselId
+        if (!r || !vid || !frames || frames.length < 2) {
+          setTimeout(() => finish(r), Math.max(0, delay - lead))
+          return
+        }
+        const total = frames[frames.length - 1].t || 1
+        const dur = playbackMs(kind, frames)
+        const start = performance.now()
+        let shown = -1
+        const step = () => {
+          const el = performance.now() - start
+          const simT = Math.min(total, (el / dur) * total)
+          let i = 0
+          while (i + 1 < frames.length && frames[i + 1].t <= simT) i++
+          if (i !== shown) {
+            shown = i
+            setPlay({ id: vid, a: frames[i].a, t: frames[i].t, total })
+          }
+          if (el < dur) rafRef.current = requestAnimationFrame(step)
+          else finish(r)
+        }
+        step()
+      }, lead)
     },
     [bump],
   )
+  const look = (id: string) => (play?.id === id ? play.a : appearance(lab.vessel(id)))
 
   const vessels = [...lab.vessels.values()]
   const sampleIds = new Set(lab.samples.values())
@@ -196,7 +250,7 @@ export function Exam({ paper, onFinish, onExit }: { paper: PaperCase; onFinish: 
               <Tube
                 key={v.id}
                 id={v.id}
-                a={appearance(v)}
+                a={look(v.id)}
                 badge={sampleBadge(v.id)}
                 selected={active === v.id}
                 busy={busy?.id === v.id ? busy.kind : null}
@@ -220,7 +274,7 @@ export function Exam({ paper, onFinish, onExit }: { paper: PaperCase; onFinish: 
               <Tube
                 key={v.id}
                 id={v.id}
-                a={appearance(v)}
+                a={look(v.id)}
                 selected={active === v.id}
                 busy={busy?.id === v.id ? busy.kind : null}
                 onClick={() => setActive(active === v.id ? null : v.id)}
@@ -248,8 +302,17 @@ export function Exam({ paper, onFinish, onExit }: { paper: PaperCase; onFinish: 
             <div className="ap-head">
               <strong>{activeV.label}</strong>
               <span className="ap-sub">
-                {activeV.wet ? `${activeV.V.toFixed(1)} cm³ liquid` : activeV.isEmpty() ? 'empty' : 'solid'}
-                {activeV.T > 30 ? ` · hot (${Math.round(activeV.T)} °C)` : ''}
+                {play?.id === activeV.id ? (
+                  <>
+                    {busy?.kind === 'heat' ? 'heating' : busy?.kind === 'wait' ? 'standing' : 'adding'} · {Math.round(play.t)} s
+                    {play.a.T > 30 ? ` · ${Math.round(play.a.T)} °C` : ''}
+                  </>
+                ) : (
+                  <>
+                    {activeV.wet ? `${activeV.V.toFixed(1)} cm³ liquid` : activeV.isEmpty() ? 'empty' : 'solid'}
+                    {activeV.T > 30 ? ` · hot (${Math.round(activeV.T)} °C)` : ''}
+                  </>
+                )}
               </span>
               <button className="icon-btn" onClick={() => setActive(null)} aria-label="Deselect">
                 ✕
@@ -341,7 +404,8 @@ export function Exam({ paper, onFinish, onExit }: { paper: PaperCase; onFinish: 
               }
             }}
             onAdd={(vid, amount) => doAdd(vid, amount, sheet.reagentId)}
-            feedback={last?.vesselId === sheet.vesselId ? feedback : null}
+            preview={sheet.vesselId && play?.id === sheet.vesselId ? play.a : undefined}
+            feedback={!busy && last?.vesselId === sheet.vesselId ? feedback : null}
           />
         )
       case 'transfer':
