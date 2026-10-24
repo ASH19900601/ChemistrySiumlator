@@ -2,9 +2,21 @@
 // confidential instructions. The observations must contain what the published mark scheme credits.
 import { describe, expect, test } from 'vitest'
 import { Lab } from '../lab'
-import { PAPERS } from '../../papers'
+import { GUIDED_PAPERS as PAPERS } from '../../papers'
 
 const EXPECT: Record<string, Record<string, RegExp[]>> = {
+  '9701_w23_31': {
+    'a-i': [/FA 6:.*stays red.*turns blue.*pink/, /FA 7:.*stays red.*decolourised/, /FA 8:.*turns blue/],
+    'b-i': [/black/i, /crackle|jump/, /relights/, /green solution/],
+    'b-ii': [/Test 3:.*(decolourised|yellow|colourless)/, /Test 4:.*brown/],
+    'b-iii': [/Off-white precipitate/i, /brown/, /remains insoluble in excess/],
+  },
+  '9701_w23_35': {
+    'a-i': [/FA 6:.*stays red.*turns blue.*pink/, /FA 7:.*stays red.*decolourised/, /FA 8:.*turns blue/],
+    'b-i': [/black/i, /crackle|jump/, /relights/, /green solution/],
+    'b-ii': [/Test 3:.*(decolourised|yellow|colourless)/, /Test 4:.*brown/],
+    'b-iii': [/Off-white precipitate/i, /brown/, /remains insoluble in excess/],
+  },
   '0620_s24_51': {
     a: [/[Cc]ondensation/, /[Mm]elts/, /green/],
     'b-i': [/[Gg]rey-green precipitate forms/, /dissolves/],

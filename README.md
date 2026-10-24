@@ -8,7 +8,7 @@ Unlike an "Alternative to Practical" worksheet, nothing is scripted: every tube 
 
 ## Features
 
-- **Real past papers** — 7 questions from 2023–2025 (4 × IGCSE 0620, 3 × 9701), with the original wording, the unknowns made up as in the confidential instructions, and the mark schemes.
+- **Original papers, 2023–2026** — 67 available qualitative question sets (22 IGCSE, 45 AS), with original questions, mark schemes and materials. Nine cases have guided bench procedures, 18 more have configured free benches, and 40 offer source-based written practice. See the [coverage ledger](docs/paper-coverage-2023-2026.md) for exact limits. These are not all AS Question 2 papers.
 - **A hands-on bench** — everything is real apparatus operated with your hands, not buttons: pick up a bottle and hold it over a tube to pour, park a dropper in a tube and squeeze it drop by drop, turn on the gas and strike a match to light the Bunsen burner, put a tube in the flame to heat it, dampen litmus paper at the wash bottle and hold it at the mouth of the tube, light a splint, collect gas with a teat pipette and bubble it through limewater, filter through a funnel. Samples stand in the rack with the other tubes. Drag, or tap to lift and tap the target; a ghost-hand demonstration shows the moves.
 - **Real time** — reactions, settling, cooling and slow changes happen while you watch; the clock on the wall can run time ten times faster.
 - **A chemistry engine, not a lookup table** — stoichiometry, solubility products, "soluble in excess", redox, gas evolution, heating and slow changes over time (e.g. Fe(OH)₂ turning brown at the surface).
@@ -19,12 +19,18 @@ Unlike an "Alternative to Practical" worksheet, nothing is scripted: every tube 
 
 ## Quick start
 
-Requirements: **Node.js 18+** (developed on Node 22) and npm.
+Requirements: **Node.js 18+**, npm, **Python 3.11+**, and Git LFS. Validated with Node 24.19.0. The original-paper library is generated from the checksum-verified LFS archive.
 
 ```bash
 git clone <this repository>
 cd ChemistrySiumlator
-npm install
+npm ci
+git lfs install --local
+git lfs pull --include=dropbox_downloads/Chemistry_Qualitative_Practicals_2001-2026.zip
+python3 -m venv ../.chemistry-paper-tools
+. ../.chemistry-paper-tools/bin/activate
+python -m pip install -r tools/requirements.txt
+npm run prepare:papers
 npm run dev
 ```
 
@@ -41,6 +47,9 @@ and open the `Network:` address shown in the terminal on the device.
 | `npm run dev` | Development server with hot reload |
 | `npm test` | Engine unit tests and past-paper regression tests (Vitest) |
 | `npm run typecheck` | TypeScript type check |
+| `npm run prepare:papers` | Generate original PDFs and readable page images from the verified archive |
+| `npm run check:papers` | Verify all 201 original PDFs and generated page availability |
+| `npm run test:browser` | Chromium desktop and touch workflow tests (requires Chromium; set `CHROMIUM_PATH` if needed) |
 | `npm run build` | Production build into `dist/` (static files) |
 | `npm run preview` | Serve the production build locally |
 
@@ -63,7 +72,7 @@ and open the `Network:` address shown in the terminal on the device.
 | 9701/34 | Oct/Nov 2024 | Q3 | 12 | FB 6 (heated, residue tested) and FB 7 (salt solution) |
 | 9701/33 | May/June 2024 | Q3(a) | 10 | FA 5, a mixture of two cations and two anions (organic part (b) not simulated) |
 
-Each paper is regression-tested: `src/engine/__tests__/papers.test.ts` follows the question's instructions with the confidential-instruction samples and checks that the engine's observations contain what the mark scheme credits.
+The table above lists the original seven guided cases. Guided AS Q2 cases `9701_w23_31` and `9701_w23_35` are also available. Guided procedures are regression-tested in `src/engine/__tests__/papers.test.ts`; the other 18 configured benches have sample-validation and representative reaction checks, not a claim that every mark-scheme point is simulated. The [complete ledger](docs/paper-coverage-2023-2026.md) lists all 67 source sets.
 
 ## Project structure
 
@@ -82,12 +91,13 @@ Tech stack: Vite 5, React 18, TypeScript 5 (strict), Vitest 2. No backend.
 
 ## Research material
 
-`dropbox_downloads/` holds the material the papers were built from: `Chemistry_Qualitative_Practicals_2001-2026.zip` (question papers, mark schemes and confidential instructions, stored with **Git LFS** — run `git lfs pull` after cloning if you need it) and the research report in Markdown and HTML. The app itself does not need these files.
+`dropbox_downloads/` holds the source archive in Git LFS and the research report. The archive is required to generate `public/past-papers/` for a fresh checkout; generated assets are ignored by Git and checked before production builds. Once built, `dist/` includes the source library and needs no Python or archive at runtime.
 
 ## Limitations
 
 - Observations are semi-quantitative and tuned to the level of detail Cambridge mark schemes expect; they are not a full physical-chemistry simulation.
 - Only the qualitative-analysis question is simulated (no titration, rates or organic tests).
+- Source coverage is the 67 retrieved public sets, not every practical exam or every AS Q2. October/November 2026 is absent from the archive. Original-paper written practice remains available for source-only cases.
 - No auto-marking, accounts or teacher dashboard yet.
 
 ## Copyright

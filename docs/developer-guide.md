@@ -21,6 +21,8 @@ How Qualitative Analysis Lab is built, how the chemistry engine works, and how t
 
 Node.js 18+ (developed on Node 22) and npm.
 
+For a fresh checkout, first follow the [README setup](../README.md#quick-start): the original-paper library needs Git LFS, Python 3.11+, the pinned `tools/requirements.txt`, and `npm run prepare:papers`. `npm run build` now checks the generated sources before compiling. `npm run test:browser` runs the Chromium/touch workflows. See the [coverage ledger](paper-coverage-2023-2026.md) for the distinction between source availability, configured benches and guided regression coverage.
+
 ```bash
 npm install
 npm run dev          # Vite dev server, http://localhost:5173 (add -- --host for LAN devices)

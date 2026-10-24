@@ -42,6 +42,12 @@ const W = (n: number) => ({ 'H2O(g)': n })
 const hydrateEvents = ['condensation']
 
 // ---------------------------------------------------------------- simple soluble salts
+c({ id: 'LiCl', formula: 'LiCl', name: 'lithium chloride', molarMass: 42.39, colour: '#fafafa', colourName: 'white', dissolves: { 'Li+': 1, 'Cl-': 1 } })
+c({ id: 'NH4I', formula: 'NH₄I', name: 'ammonium iodide', molarMass: 144.94, colour: '#fafafa', colourName: 'white', dissolves: { 'NH4+': 1, 'I-': 1 } })
+c({ id: 'ZnSO4', formula: 'ZnSO₄', name: 'anhydrous zinc sulfate', molarMass: 161.44, colour: '#fafafa', colourName: 'white', dissolves: { 'Zn2+': 1, 'SO4 2-': 1 } })
+c({ id: 'MnSO4', formula: 'MnSO₄', name: 'manganese(II) sulfate', molarMass: 151.0, colour: '#f2dfe4', colourName: 'very pale pink', dissolves: { 'Mn2+': 1, 'SO4 2-': 1 } })
+c({ id: 'Fe(NO3)3.9H2O', formula: 'Fe(NO₃)₃·9H₂O', name: 'iron(III) nitrate nonahydrate', molarMass: 404.0, colour: '#eee1c1', colourName: 'pale yellow', dissolves: { 'Fe3+': 1, 'NO3-': 3 },
+  thermal: [{ minTemp: 120, halfLife: 20, products: { 'Fe2O3(s)': 0.5, 'NO2(g)': 3, 'O2(g)': 0.75, ...W(9) }, events: ['melts', 'brown gas given off', ...hydrateEvents] }] })
 c({ id: 'NaCl', formula: 'NaCl', name: 'sodium chloride', molarMass: 58.44, colour: '#fafafa', colourName: 'white',
   dissolves: { 'Na+': 1, 'Cl-': 1 } })
 c({ id: 'KCl', formula: 'KCl', name: 'potassium chloride', molarMass: 74.55, colour: '#fafafa', colourName: 'white',

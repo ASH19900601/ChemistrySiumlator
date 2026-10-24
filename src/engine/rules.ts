@@ -268,9 +268,13 @@ r({ id: 'MnO4+C2O4', type: 'kinetic', reactants: { 'MnO4-': 2, 'C2O4 2-': 5, 'H+
 r({ id: 'MnO4+SO3(alk)', type: 'complete', priority: 7, reactants: { 'MnO4-': 2, 'SO3 2-': 3 }, products: { 'MnO2(s)': 2, 'SO4 2-': 3, 'OH-': 2 } })
 r({ id: 'MnO4+I-(alk)', type: 'complete', priority: 7, reactants: { 'MnO4-': 2, 'I-': 6 }, products: { 'MnO2(s)': 2, I2: 3, 'OH-': 8 } })
 r({ id: 'MnO4+Fe(OH)2', type: 'complete', priority: 7, reactants: { 'MnO4-': 1, 'Fe(OH)2(s)': 3 }, products: { 'MnO2(s)': 1, 'Fe(OH)3(s)': 3, 'OH-': 1 } })
-// manganate(VI) disproportionates unless the solution is strongly alkaline
+// Manganate(VI) disproportionates rapidly in acid. Fresh water extracts of heated KMnO4
+// remain visibly green while shaken/settled (9701_w23_31/35 Q2(b)(i)); do not turn them
+// purple within a mixing step. Dilute water extracts (9701_w24_34 Q3(a)(ii)) turn purple;
+// concentrated extracts stay green initially. This concentration threshold and neutral
+// half-life reproduce those observation windows, rather than a fitted kinetic law.
 r({ id: 'MnO4 2- disproportionation', type: 'kinetic', reactants: { 'MnO4 2-': 3 }, products: { 'MnO4-': 2, 'MnO2(s)': 1, 'OH-': 4 },
-  halfLife: (x) => (x.c('OH-') > 0.5 ? Infinity : x.c('H+') > 1e-4 ? 0.2 : 0.5) })
+  halfLife: (x) => (x.c('OH-') > 0.5 ? Infinity : x.c('H+') > 1e-4 ? 0.2 : x.c('MnO4 2-') >= 0.05 ? 600 : 0.5) })
 
 // iron(III) and copper(II) oxidise iodide
 r({ id: 'Fe3++I-', type: 'complete', priority: 6, reactants: { 'Fe3+': 2, 'I-': 2 }, products: { 'Fe2+': 2, I2: 1 } })
@@ -282,6 +286,9 @@ r({ id: 'Cr2O7+SO2', type: 'complete', priority: 6, reactants: { 'Cr2O7 2-': 1, 
 r({ id: 'Cr2O7+I-', type: 'complete', priority: 6, reactants: { 'Cr2O7 2-': 1, 'I-': 6, 'H+': 14 }, products: { 'Cr3+': 2, I2: 3 } })
 r({ id: 'Cr2O7+H2O2', type: 'kinetic', reactants: { 'Cr2O7 2-': 1, H2O2: 3, 'H+': 8 }, products: { 'Cr3+': 2, 'O2(g)': 3 }, halfLife: 8 })
 // iodine / thiosulfate / starch
+r({ id: 'Cl2+I-', type: 'complete', priority: 5, reactants: { 'Cl2(aq)': 1, 'I-': 2 }, products: { I2: 1, 'Cl-': 2 } })
+r({ id: 'Cl2+Br-', type: 'complete', priority: 5, reactants: { 'Cl2(aq)': 1, 'Br-': 2 }, products: { 'Br2(aq)': 1, 'Cl-': 2 } })
+r({ id: 'Cl2+Fe2+', type: 'complete', priority: 6, reactants: { 'Cl2(aq)': 1, 'Fe2+': 2 }, products: { 'Fe3+': 2, 'Cl-': 2 } })
 r({ id: 'I2+S2O3', type: 'complete', priority: 5, reactants: { I2: 1, 'S2O3 2-': 2 }, products: { 'I-': 2, 'S4O6 2-': 1 } })
 r({ id: 'starchI2+S2O3', type: 'complete', priority: 5, reactants: { 'starch-I2': 1, 'S2O3 2-': 2 }, products: { starch: 1, 'I-': 2, 'S4O6 2-': 1 } })
 r({ id: 'starch+I2', type: 'equilibrium', priority: 8, reactants: { starch: 1, I2: 1 }, products: { 'starch-I2': 1 }, K: 2e5 })

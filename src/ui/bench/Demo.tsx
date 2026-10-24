@@ -72,7 +72,7 @@ export function Demo({ onEnd }: { onEnd: () => void }) {
   }, [onEnd])
   const k = at(t)
   return (
-    <g className="demo" onPointerDown={onEnd}>
+    <g className="demo" onPointerDown={(e) => { e.stopPropagation(); onEnd() }} onPointerUp={(e) => e.stopPropagation()}>
       <rect x="0" y="0" width={SCENE_W} height={SCENE_H} fill="rgba(20,24,28,0.18)" />
       <g transform={`translate(${k.x},${k.y}) scale(${k.press ? 0.92 : 1})`}>
         {k.press && <circle r="26" fill="rgba(255,255,255,0.35)" stroke="#fff" strokeWidth="3" className="tap-ring" />}

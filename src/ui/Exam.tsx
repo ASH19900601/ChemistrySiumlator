@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Lab } from '../engine'
 import type { PaperCase } from '../papers'
 import { Bench } from './bench/Bench'
 import { BenchModel } from './bench/model'
 import { setSoundEnabled, sound } from './bench/sound'
 import { PaperPane, type Answers } from './PaperPane'
-import { load, save } from './storage'
+import { isAnswers, load, save } from './storage'
 
 type Tab = 'lab' | 'paper' | 'notes'
 
@@ -16,13 +16,13 @@ export function Exam({ paper, onFinish, onExit }: { paper: PaperCase; onFinish: 
   if (import.meta.env.DEV) (window as unknown as { __bench?: BenchModel }).__bench = model
   const lab = model.lab
   const [version, setVersion] = useState(0)
-  const [tab, setTab] = useState<Tab>('lab')
+  const [tab, setTab] = useState<Tab>(paper.coverage === 'source-only' ? 'paper' : 'lab')
   const [sideTab, setSideTab] = useState<'paper' | 'notes'>('paper')
   const [sideOpen, setSideOpen] = useState(true)
   const [showText, setShowText] = useState<boolean>(() => load('show-text', false))
   const [soundOn, setSoundOn] = useState<boolean>(() => load('sound', true))
   const [demo, setDemo] = useState<boolean>(() => !load('demo-seen', false))
-  const [answers, setAnswers] = useState<Answers>(() => load(`answers:${paper.id}`, {}))
+  const [answers, setAnswers] = useState<Answers>(() => load(`answers:${paper.id}`, {}, isAnswers))
   const [notes, setNotes] = useState<string>(() => load(`notes:${paper.id}`, ''))
   const [started] = useState(() => Date.now())
 
@@ -39,16 +39,23 @@ export function Exam({ paper, onFinish, onExit }: { paper: PaperCase; onFinish: 
     let last = performance.now()
     const t = setInterval(() => {
       const now = performance.now()
+      if (document.hidden) { last = now; return }
       const dt = Math.min(0.25, (now - last) / 1000)
       last = now
       model.step(dt, now)
       setVersion(model.version)
     }, 100)
+    const visibility = () => { last = performance.now(); if (document.hidden) model.cancel() }
+    document.addEventListener('visibilitychange', visibility)
     return () => {
       clearInterval(t)
+      document.removeEventListener('visibilitychange', visibility)
+      model.cancel()
       sound.stopPour()
     }
   }, [model])
+
+  const changeTab = (next: Tab) => { model.cancel(); setTab(next) }
 
   const endDemo = useCallback(() => {
     setDemo(false)
@@ -58,17 +65,18 @@ export function Exam({ paper, onFinish, onExit }: { paper: PaperCase; onFinish: 
   const elapsed = Math.floor((Date.now() - started) / 1000)
   const clock = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`
 
-  const finish = () => {
+  const finish = useCallback(() => {
     if (!confirm('Finish the question and go to self-marking?')) return
     model.finishAll()
     onFinish(answers, lab)
-  }
+  }, [model, onFinish, answers, lab])
+  const setAnswer = useCallback((k: string, v: string) => setAnswers(a => ({ ...a, [k]: v })), [])
 
   // the latest observation, shown on the bench only when observation text is switched on
   const lastEntry = lab.journal[lab.journal.length - 1]
   const recent = lastEntry && lab.time - lastEntry.time < 12 ? lastEntry : null
 
-  const notebook = (
+  const notebook = useMemo(() => (
     <div className="notebook">
       <h3>Lab notebook</h3>
       <p className="hint">Everything you do is logged here. {showText ? 'Observation text is shown.' : 'Observation text is hidden: record what you see.'}</p>
@@ -87,14 +95,14 @@ export function Exam({ paper, onFinish, onExit }: { paper: PaperCase; onFinish: 
         <textarea rows={6} value={notes} onChange={(e) => setNotes(e.target.value)} />
       </label>
     </div>
-  )
+  ), [lab, lab.journal.length, showText, notes])
 
-  const paperView = <PaperPane paper={paper} answers={answers} setAnswer={(k, v) => setAnswers((a) => ({ ...a, [k]: v }))} onFinish={finish} />
+  const paperView = <PaperPane paper={paper} answers={answers} setAnswer={setAnswer} onFinish={finish} />
 
   return (
-    <div className="exam">
+    <div className={`exam${paper.coverage === 'source-only' ? ' source-only' : ''}`}>
       <header className="topbar">
-        <button className="icon-btn" onClick={() => confirm('Leave this question? Your written answers are kept on this device.') && onExit()} aria-label="Back">
+        <button className="icon-btn" onClick={() => confirm('Leave this question? The bench and experiment log will reset. Your written answers and rough notes are kept on this device.') && onExit()} aria-label="Back">
           ←
         </button>
         <div className="tb-title">
@@ -106,13 +114,13 @@ export function Exam({ paper, onFinish, onExit }: { paper: PaperCase; onFinish: 
         <div className="tb-clock" title="Time spent">
           ⏱ {clock}
         </div>
-        <button className="icon-btn tb-icon" onClick={() => setDemo(true)} title="Show how the bench works" aria-label="Show how the bench works">
+        <button className="icon-btn tb-icon bench-control" onClick={() => setDemo(true)} title="Show how the bench works" aria-label="Show how the bench works">
           ?
         </button>
-        <button className="icon-btn tb-icon" onClick={() => setSoundOn(!soundOn)} title={soundOn ? 'Sound on' : 'Sound off'} aria-label="Sound">
+        <button className="icon-btn tb-icon bench-control" onClick={() => setSoundOn(!soundOn)} title={soundOn ? 'Sound on' : 'Sound off'} aria-label="Sound" aria-pressed={soundOn}>
           {soundOn ? '🔊' : '🔇'}
         </button>
-        <label className="toggle" title="Show the engine's observation text (practice aid)">
+        <label className="toggle bench-control" title="Show the engine's observation text (practice aid)">
           <input type="checkbox" checked={showText} onChange={(e) => setShowText(e.target.checked)} />
           <span>Observation text</span>
         </label>
@@ -126,7 +134,7 @@ export function Exam({ paper, onFinish, onExit }: { paper: PaperCase; onFinish: 
 
       <main className={`exam-main tab-${tab}${sideOpen ? '' : ' side-closed'}`}>
         <div className="pane pane-lab">
-          <Bench model={model} version={version} demo={demo} onDemoEnd={endDemo} />
+          {paper.coverage !== 'source-only' && <Bench model={model} version={version} demo={demo} onDemoEnd={endDemo} />}
           {showText && recent && (
             <div className="obs-caption" key={lab.journal.length}>
               <div className="obs-action">{recent.action}</div>
@@ -151,13 +159,13 @@ export function Exam({ paper, onFinish, onExit }: { paper: PaperCase; onFinish: 
       </main>
 
       <nav className="bottom-tabs">
-        <button className={tab === 'lab' ? 'on' : ''} onClick={() => setTab('lab')}>
+        {paper.coverage !== 'source-only' && <button className={tab === 'lab' ? 'on' : ''} onClick={() => changeTab('lab')} aria-current={tab === 'lab' ? 'page' : undefined}>
           🧪 Lab
-        </button>
-        <button className={tab === 'paper' ? 'on' : ''} onClick={() => setTab('paper')}>
+        </button>}
+        <button className={tab === 'paper' ? 'on' : ''} onClick={() => changeTab('paper')} aria-current={tab === 'paper' ? 'page' : undefined}>
           📄 Paper
         </button>
-        <button className={tab === 'notes' ? 'on' : ''} onClick={() => setTab('notes')}>
+        <button className={tab === 'notes' ? 'on' : ''} onClick={() => changeTab('notes')} aria-current={tab === 'notes' ? 'page' : undefined}>
           📓 Notebook
         </button>
       </nav>

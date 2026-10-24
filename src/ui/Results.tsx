@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { Lab, type JournalEntry } from '../engine'
 import type { PaperCase } from '../papers'
 import { answerKeys, PaperHeader, Prose, type Answers } from './PaperPane'
-import { load, save } from './storage'
+import { isMarks, load, save } from './storage'
+import { SourceDocument } from './SourceDocument'
 
 export function Results({
   paper,
@@ -17,7 +18,7 @@ export function Results({
   onRetry: () => void
   onHome: () => void
 }) {
-  const [marks, setMarks] = useState<Record<string, number>>(() => load(`marks:${paper.id}`, {}))
+  const [marks, setMarks] = useState<Record<string, number>>(() => load(`marks:${paper.id}`, {}, isMarks))
   useEffect(() => save(`marks:${paper.id}`, marks), [paper.id, marks])
   const total = paper.parts.reduce((s, p) => s + Math.min(p.marks, marks[p.id] ?? 0), 0)
   const supervisor = useMemo(() => {
@@ -96,14 +97,20 @@ export function Results({
               </section>
             )
           })}
-          <section className="identities">
+          {paper.source && <section className="original-mark-scheme">
+            <h2>Published mark scheme</h2>
+            <p className="hint">Mark Question {paper.question} only. The original extract can also contain marking for adjacent questions.</p>
+            <SourceDocument asset={paper.source.assets.markScheme} title="Original mark scheme" originalPages={paper.source.ms_pages} />
+            {paper.source.assets.materials1 && <details><summary>Confidential instructions and sample preparation</summary><SourceDocument asset={paper.source.assets.materials1} title="Confidential instructions" /></details>}
+          </section>}
+          {paper.identities.length > 0 && <section className="identities">
             <div className="mini-head">What the unknowns were (confidential instructions)</div>
             <ul>
               {paper.identities.map((x, i) => (
                 <li key={i}>{x}</li>
               ))}
             </ul>
-          </section>
+          </section>}
           <section className="your-log">
             <button className="btn link" onClick={() => setShowLog(!showLog)}>
               {showLog ? 'Hide' : 'Show'} everything you did in the lab ({journal.length} actions)

@@ -73,6 +73,7 @@ const PlacedTubeInner = memo(function PlacedTubeInner({ id, a, x, y, s, badge }:
   return <Tube id={id} a={a} badge={badge} at={{ x, y, s }} />
 })
 const PlacedTube = ({ id, a, b, badge }: { id: string; a: Appearance; b: TubeBox; badge?: string }) => <PlacedTubeInner id={id} a={a} x={b.x} y={b.y} s={b.s} badge={badge} />
+const StaticRoom = memo(Room)
 
 export function Bench({ model, version, demo, onDemoEnd }: { model: BenchModel; version: number; demo: boolean; onDemoEnd: () => void }) {
   void version
@@ -81,6 +82,19 @@ export function Bench({ model, version, demo, onDemoEnd }: { model: BenchModel; 
   const wrap = useRef<HTMLDivElement>(null)
   const svg = useRef<SVGSVGElement>(null)
   const [size, setSize] = useState({ w: 0, h: 0 })
+  const [zoom, setZoom] = useState<number | null>(null)
+  const [coarse] = useState(() => window.matchMedia('(pointer: coarse)').matches)
+  const [, repaint] = useState(0)
+  const paint = useRef(0)
+  const pointer = useRef<{ id: number; x: number; y: number } | null>(null)
+  const pan = useRef<{ x: number; y: number; left: number; top: number } | null>(null)
+  const edgeFrame = useRef(0)
+  const requestPaint = useCallback(() => {
+    if (!paint.current) paint.current = requestAnimationFrame(() => {
+      paint.current = 0
+      repaint(v => v + 1)
+    })
+  }, [])
 
   useLayoutEffect(() => {
     const el = wrap.current
@@ -93,7 +107,7 @@ export function Bench({ model, version, demo, onDemoEnd }: { model: BenchModel; 
 
   // fit the whole bench; on narrow phones fill the height and scroll sideways
   const fit = Math.min(size.w / SCENE_W, size.h / SCENE_H) || 0.5
-  const scale = fit < 0.42 ? Math.max(fit, size.h / SCENE_H) : fit
+  const scale = zoom ?? (coarse ? Math.max(fit, 0.7) : fit < 0.42 ? Math.max(fit, size.h / SCENE_H) : fit)
   const W = Math.floor(SCENE_W * scale)
   const H = Math.floor(SCENE_H * scale)
 
@@ -107,36 +121,86 @@ export function Bench({ model, version, demo, onDemoEnd }: { model: BenchModel; 
   }, [])
 
   const onDown = (e: RPointerEvent<SVGSVGElement>) => {
-    if (e.button !== 0) return
+    if (e.button !== 0 || !e.isPrimary || pointer.current || demo) return
+    pointer.current = { id: e.pointerId, x: e.clientX, y: e.clientY }
     const id = (e.target as Element).getAttribute?.('data-hit')
-    if (id || m.held) {
-      svg.current!.setPointerCapture(e.pointerId)
-      e.preventDefault()
+    if (!id && !m.held && wrap.current) {
+      pan.current = { x: e.clientX, y: e.clientY, left: wrap.current.scrollLeft, top: wrap.current.scrollTop }
     }
+    svg.current!.setPointerCapture(e.pointerId)
+    e.preventDefault()
     const p = toScene(e)
     m.down(id, p.x, p.y)
+    requestPaint()
+    // Continue scrolling while a held finger stays at the edge, without requiring more move events.
+    let last = performance.now()
+    const followEdge = (now: number) => {
+      const active = pointer.current
+      const el = wrap.current
+      if (!active || !el) return
+      const dt = Math.min(0.05, (now - last) / 1000)
+      last = now
+      if (m.held?.dragging) {
+        const r = el.getBoundingClientRect()
+        const velocity = (p: number, lo: number, hi: number) => p < lo + 48 ? -360 * Math.min(1, (lo + 48 - p) / 48) : p > hi - 48 ? 360 * Math.min(1, (p - hi + 48) / 48) : 0
+        const left = el.scrollLeft, top = el.scrollTop
+        el.scrollLeft += velocity(active.x, r.left, r.right) * dt
+        el.scrollTop += velocity(active.y, r.top, r.bottom) * dt
+        if (left !== el.scrollLeft || top !== el.scrollTop) {
+          const point = toScene({ clientX: active.x, clientY: active.y })
+          m.move(point.x, point.y)
+          requestPaint()
+        }
+      }
+      edgeFrame.current = requestAnimationFrame(followEdge)
+    }
+    edgeFrame.current = requestAnimationFrame(followEdge)
   }
   const onMove = (e: RPointerEvent<SVGSVGElement>) => {
+    if (pointer.current?.id !== e.pointerId) return
+    pointer.current.x = e.clientX
+    pointer.current.y = e.clientY
+    if (pan.current && wrap.current) {
+      wrap.current.scrollLeft = pan.current.left + pan.current.x - e.clientX
+      wrap.current.scrollTop = pan.current.top + pan.current.y - e.clientY
+      return
+    }
     const p = toScene(e)
     m.move(p.x, p.y)
-    // keep the dragged item in view on a scrolling (phone) bench
-    const el = wrap.current
-    if (el && m.held?.dragging && el.scrollWidth > el.clientWidth) {
-      const r = el.getBoundingClientRect()
-      if (e.clientX < r.left + 36) el.scrollLeft -= 14
-      else if (e.clientX > r.right - 36) el.scrollLeft += 14
-    }
+    requestPaint()
   }
   const onUp = (e: RPointerEvent<SVGSVGElement>) => {
+    if (pointer.current?.id !== e.pointerId) return
+    pointer.current = null
+    pan.current = null
+    cancelAnimationFrame(edgeFrame.current)
     const p = toScene(e)
     m.up(p.x, p.y)
+    if (svg.current?.hasPointerCapture(e.pointerId)) svg.current.releasePointerCapture(e.pointerId)
+    requestPaint()
   }
 
+  const cancelInput = useCallback(() => {
+    pointer.current = null
+    pan.current = null
+    cancelAnimationFrame(edgeFrame.current)
+    m.cancel()
+    requestPaint()
+  }, [m, requestPaint])
+
   useEffect(() => {
-    const cancel = () => m.cancel()
-    window.addEventListener('blur', cancel)
-    return () => window.removeEventListener('blur', cancel)
-  }, [m])
+    window.addEventListener('blur', cancelInput)
+    return () => {
+      window.removeEventListener('blur', cancelInput)
+      cancelAnimationFrame(edgeFrame.current)
+      cancelAnimationFrame(paint.current)
+    }
+  }, [cancelInput])
+
+  const focusAt = (x: number, y: number) => {
+    const el = wrap.current
+    el?.scrollTo({ left: x * scale - el.clientWidth / 2, top: y * scale - el.clientHeight / 2, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
+  }
 
   const held = m.held
   const heldTube = held?.item.k === 'tube' ? held.item.id : null
@@ -155,6 +219,7 @@ export function Bench({ model, version, demo, onDemoEnd }: { model: BenchModel; 
   else if (zone?.t === 'tube' && held && ['bottle', 'wash', 'tube', 'dropper'].includes(held.item.k)) marksFor = zone.id
 
   return (
+    <div className="bench-container">
     <div className="bench-wrap" ref={wrap}>
       <svg
         ref={svg}
@@ -165,11 +230,12 @@ export function Bench({ model, version, demo, onDemoEnd }: { model: BenchModel; 
         onPointerDown={onDown}
         onPointerMove={onMove}
         onPointerUp={onUp}
-        onPointerCancel={() => m.cancel()}
+        onPointerCancel={(e) => { if (pointer.current?.id === e.pointerId) cancelInput() }}
+        onLostPointerCapture={(e) => { if (pointer.current?.id === e.pointerId) cancelInput() }}
         role="application"
         aria-label="Laboratory bench"
       >
-        <Room />
+        <StaticRoom />
         <Clock t={lab.time} fast={m.fast} />
 
         {/* shelf */}
@@ -258,13 +324,38 @@ export function Bench({ model, version, demo, onDemoEnd }: { model: BenchModel; 
         <g className="hits">
           {/* first in the list = on top */}
           {m.hitRects().slice().reverse().map((r) => (
-            <rect key={r.id} data-hit={r.id} x={r.x} y={r.y} width={r.w} height={r.h} />
+            <rect key={r.id} data-hit={r.id}
+              x={r.x - (coarse ? Math.max(0, 64 - r.w) / 2 : 0)} y={r.y - (coarse ? Math.max(0, 64 - r.h) / 2 : 0)}
+              width={coarse ? Math.max(64, r.w) : r.w} height={coarse ? Math.max(64, r.h) : r.h}
+              role="button" tabIndex={demo ? -1 : 0} aria-label={m.hitLabel(r.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  const x = r.x + r.w / 2, y = r.y + r.h / 2
+                  m.down(r.id, x, y)
+                  m.up(x, y)
+                  m.bump()
+                  requestPaint()
+                } else if (e.key === 'Escape') m.cancel()
+              }} />
           ))}
         </g>
 
         {demo && <Demo onEnd={onDemoEnd} />}
       </svg>
-      {m.notice && <div className="bench-notice">{m.notice.text}</div>}
+    </div>
+    <nav className="bench-nav" aria-label="Bench view">
+      <button onClick={() => focusAt(460, 140)}>Reagents</button>
+      <button onClick={() => focusAt(330, 555)}>Tubes</button>
+      <button onClick={() => focusAt(850, 570)}>Burner</button>
+      <button onClick={() => focusAt(610, 820)}>Tools</button>
+      <button onClick={() => focusAt(1190, 730)}>Wash</button>
+      <button aria-label="Zoom out" onClick={() => setZoom(Math.max(0.25, scale - 0.15))}>−</button>
+      <button aria-label="Fit bench" onClick={() => { setZoom(fit); wrap.current?.scrollTo(0, 0) }}>Fit</button>
+      <button aria-label="Zoom in" onClick={() => setZoom(Math.min(1.5, scale + 0.15))}>+</button>
+      {held && <button onClick={() => { m.putBack(); requestPaint() }}>Put back</button>}
+    </nav>
+    {m.notice && <div className="bench-notice" role="status">{m.notice.text}</div>}
     </div>
   )
 }

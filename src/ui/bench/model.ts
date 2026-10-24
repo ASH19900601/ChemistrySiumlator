@@ -349,6 +349,17 @@ export class BenchModel {
     }
   }
 
+  /** Names for keyboard and assistive-technology operation of the same apparatus. */
+  hitLabel(id: string): string {
+    const [kind, arg] = id.split(/:(.*)/s)
+    if (kind === 'box') return `New ${arg}`
+    if (kind === 'tube') return this.lab.vessel(arg).label
+    if (kind === 'stopper') return `Remove stopper from ${this.lab.vessel(arg).label}`
+    if (kind === 'bottle' || kind === 'dropper' || kind === 'piece' || kind === 'jar') return `${kind} ${REAGENTS[arg]?.label ?? arg}`
+    if (kind === 'booklet') return `${arg} paper`
+    return ({ held: 'Held apparatus', parked: 'Squeeze parked dropper', gastap: 'Toggle gas tap', collar: 'Toggle burner air hole', clock: 'Toggle ten times speed', wash: 'Distilled water wash bottle', matchbox: 'Light a match', stoppers: 'New stopper' } as Record<string, string>)[kind] ?? kind
+  }
+
   parkedTip(): { x: number; y: number } | null {
     if (!this.parked) return null
     if (this.parked.target === 'funnel') {
@@ -501,6 +512,11 @@ export class BenchModel {
       if (this.pressing) {
         // sliding the finger while pressing ends the hold action
         this.endPressing()
+        if (this.held) {
+          this.held.dragging = true
+          this.held.ox = this.held.x - p.x
+          this.held.oy = this.held.y - p.y
+        }
       } else if (pend) {
         // dragging something else: put down what is in the hand first
         if (pend.id && this.pickable(pend.id)) {
@@ -600,7 +616,7 @@ export class BenchModel {
     this.squeezing = null
     this.pending = null
     this.endPressing()
-    if (this.held?.dragging) this.putBack()
+    this.putBack()
     this.bump()
   }
 
@@ -634,7 +650,10 @@ export class BenchModel {
     const [kind, arg] = id.split(/:(.*)/s)
     switch (kind) {
       case 'tube': {
-        if (this.funnel.on === arg) this.funnel.on = null
+        if (this.funnel.on === arg) {
+          if (this.parked?.target === 'funnel') this.unpark()
+          this.funnel.on = null
+        }
         if (this.parked && this.parked.target !== 'funnel' && this.parked.target.vesselId === arg) this.unpark()
         if (this.places.get(arg)?.at === 'burner') this.stopHeating()
         return { k: 'tube', id: arg }
@@ -671,6 +690,7 @@ export class BenchModel {
       case 'wire':
         return { k: 'wire', reading: null, colour: null }
       case 'funnel':
+        if (this.parked?.target === 'funnel') this.unpark()
         this.funnel.on = null
         return { k: 'funnel' }
       default:
@@ -749,7 +769,8 @@ export class BenchModel {
       const surf = surfaceY(b, this.vesselKind(arg), a.liquidLevel)
       const liquidTap = a.liquidLevel > 0.004 && y >= surf - 4
       let part: 'mouth' | 'inside' | 'liquid' = 'mouth'
-      if (it.k === 'wire' || it.k === 'spatula') part = 'inside'
+      if (it.k === 'wire') part = a.liquidLevel > 0.004 ? 'liquid' : 'inside'
+      if (it.k === 'spatula') part = 'inside'
       if ((it.k === 'strip' || it.k === 'pipette') && liquidTap) part = 'liquid'
       if (this.funnel.on === arg && ['bottle', 'wash', 'tube', 'dropper'].includes(it.k)) return { t: 'funnel' }
       const z: Zone = { t: 'tube', id: arg, part }
@@ -915,6 +936,8 @@ export class BenchModel {
       }
       case 'stopper':
         if (z.t === 'tube') {
+          if (this.parked?.action.vesselId === z.id) this.unpark()
+          if (this.funnel.on === z.id) this.funnel.on = null
           this.lab.setStopper(z.id, true)
           sound.clink()
         }
@@ -1023,6 +1046,8 @@ export class BenchModel {
   private squeeze() {
     const p = this.parked
     if (!p) return
+    if (this.lab.vessels.get(p.action.vesselId)?.stoppered ||
+        (p.target === 'funnel' && this.funnel.on !== p.action.vesselId)) return this.unpark()
     if (!this.lab.isOpen(p.action)) {
       const dest = p.action.vesselId
       if (!this.lab.vessels.has(dest)) return this.unpark()
@@ -1058,15 +1083,15 @@ export class BenchModel {
     if (!dest || (into && !this.funnel.paperId)) return
     if ('vesselId' in src && (this.lab.vessel(src.vesselId).isEmpty() || this.lab.vessel(src.vesselId).stoppered)) return
     const key = this.pourKey(h.item, z)
-    if (!this.pour || this.pour.key !== key) {
+    if (!this.pour || this.pour.key !== key || !this.lab.isOpen(this.pour.action)) {
       this.stopPour()
       this.pour = { action: this.lab.begin(dest, 'Pour'), key, src, volume: 0, grams: 0, intoFunnel: into }
       sound.startPour()
     }
     const rate = h.item.k === 'tube' ? 1.3 : 1.0
+    const dry = 'vesselId' in src && !this.lab.vessel(src.vesselId).wet
     const moved = into ? this.lab.filterStep(this.pour.action, src, this.funnel.paperId!, rate * dt) : this.lab.pourStep(this.pour.action, src, rate * dt)
-    const dry = 'vesselId' in src && !this.lab.vessel(src.vesselId).wet && this.pour.volume === 0
-    if (dry && !into) this.pour.grams += moved
+    if (dry) this.pour.grams += moved
     else this.pour.volume += moved
   }
 
@@ -1082,7 +1107,7 @@ export class BenchModel {
     const what = 'reagentId' in src ? REAGENTS[src.reagentId].label : `the contents of ${this.lab.vessels.get(src.vesselId)?.label ?? 'the tube'}`
     const depth = p.volume / dest.spec.area
     const amount = `about ${round1(p.volume)} cm³ (≈ ${round1(depth)} cm depth)`
-    const label = p.grams > 0 ? `Tip about ${round2(p.grams)} g of solid from ${what.replace('the contents of ', '')} into ${dest.label}` : p.intoFunnel ? `Pour ${amount} of ${what} through the filter paper into ${dest.label}` : `Pour ${amount} of ${what} into ${dest.label}`
+    const label = p.grams > 0 ? `Tip about ${round2(p.grams)} g of solid from ${what.replace('the contents of ', '')} ${p.intoFunnel ? 'through the filter paper into' : 'into'} ${dest.label}` : p.intoFunnel ? `Pour ${amount} of ${what} through the filter paper into ${dest.label}` : `Pour ${amount} of ${what} into ${dest.label}`
     this.lab.release(p.action, label, 4)
   }
 
@@ -1103,7 +1128,7 @@ export class BenchModel {
       return
     }
     const rank = mode === 'boil' || mode === 'strong' ? 2 : 1
-    if (!this.heat || this.heat.vesselId !== id) {
+    if (!this.heat || this.heat.vesselId !== id || !this.lab.isOpen(this.heat.action)) {
       this.stopHeating()
       const v = this.lab.vessel(id)
       if (v.stoppered) {
@@ -1228,6 +1253,7 @@ export class BenchModel {
   /** Advance the bench by `dtReal` seconds of real time. */
   step(dtReal: number, nowMs: number) {
     this.now = nowMs
+    if (this.held?.item.k === 'match' && this.now >= this.held.item.until) this.putBack()
     const speed = this.fast ? 10 : 1
     this.lab.tick(dtReal * speed)
     // press-and-hold on a target with a lifted item

@@ -1,4 +1,6 @@
+import { memo } from 'react'
 import type { PaperCase, QuestionPart } from '../papers'
+import { SourceDocument } from './SourceDocument'
 
 export type Answers = Record<string, string>
 
@@ -21,10 +23,22 @@ export function PaperHeader({ paper }: { paper: PaperCase }) {
   )
 }
 
-export function PaperPane({ paper, answers, setAnswer, onFinish }: { paper: PaperCase; answers: Answers; setAnswer: (k: string, v: string) => void; onFinish: () => void }) {
+export const PaperPane = memo(function PaperPane({ paper, answers, setAnswer, onFinish }: { paper: PaperCase; answers: Answers; setAnswer: (k: string, v: string) => void; onFinish: () => void }) {
+  if (paper.source && paper.coverage !== 'guided') return <article className="paper original-paper">
+    <PaperHeader paper={paper} />
+    {paper.coverage === 'source-only' && <p className="paper-note">Original-paper written practice. An interactive bench for this paper is not yet available.</p>}
+    <SourceDocument asset={paper.source.assets.question} title="Original question" originalPages={paper.source.qp_pages} />
+    <p className="hint">Use the original question above. Label each written response with its part number. The mark scheme and confidential instructions are shown after you finish.</p>
+    {paper.coverage === 'configured' && <p className="paper-note">Samples and reagents are prepared for free bench practice. Some reactions or apparatus may be unavailable; this paper has not been verified against every mark-scheme point.</p>}
+    <label className="source-answer"><span>Your answers to Question {paper.question}</span>
+      <textarea className="answer lined" rows={18} value={answers.response ?? ''} onChange={e => setAnswer('response', e.target.value)} />
+    </label>
+    <div className="paper-foot"><button className="btn primary" onClick={onFinish}>Finish and mark my answers</button></div>
+  </article>
   return (
     <article className="paper">
       <PaperHeader paper={paper} />
+      {paper.source && <details className="original-reference"><summary>Read the original question paper</summary><SourceDocument asset={paper.source.assets.question} title="Original question" originalPages={paper.source.qp_pages} /></details>}
       {paper.intro && <Prose text={paper.intro} />}
       {paper.omitted && <p className="paper-note">{paper.omitted}</p>}
       {paper.parts.map((p) => (
@@ -47,7 +61,7 @@ export function PaperPane({ paper, answers, setAnswer, onFinish }: { paper: Pape
       </div>
     </article>
   )
-}
+})
 
 function AnswerInput({ part, answers, setAnswer }: { part: QuestionPart; answers: Answers; setAnswer: (k: string, v: string) => void }) {
   const a = part.answer

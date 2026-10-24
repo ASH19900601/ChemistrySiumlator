@@ -141,7 +141,9 @@ export class Vessel {
   }
 
   /** Add material; overflow is reported by the caller. */
-  receive(n: Map<string, number> | Record<string, number>, V: number) {
+  receive(n: Map<string, number> | Record<string, number>, V: number, temperature = ROOM_T) {
+    // A volume-weighted approximation; do not reset a transferred hot solution to room temperature.
+    if (V > 0) this.T = (this.T * this.V + temperature * V) / (this.V + V)
     const entries = n instanceof Map ? [...n.entries()] : Object.entries(n)
     for (const [id, amt] of entries) this.change(id, amt)
     this.V += V

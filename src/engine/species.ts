@@ -158,6 +158,8 @@ add({
   colourName: (c) => (c < 0.0003 ? 'pale yellow' : c < 0.0015 ? 'yellow-brown' : c < 0.01 ? 'brown' : 'dark brown'),
 })
 add({ id: 'starch', formula: 'starch', name: 'starch', phase: 'aq' })
+add({ id: 'Cl2(aq)', formula: 'Cl₂(aq)', name: 'dissolved chlorine', phase: 'aq', tint: '#c7cf61', refConc: 0.03, colourName: 'pale yellow-green' })
+add({ id: 'Br2(aq)', formula: 'Br₂(aq)', name: 'dissolved bromine', phase: 'aq', tint: '#c26a22', refConc: 0.01, colourName: 'orange-brown' })
 add({ id: 'S-nuclei', formula: 'S', name: 'sulfur (not yet visible)', phase: 'aq' })
 add({
   id: 'starch-I2', formula: 'starch–iodine', name: 'starch–iodine complex', phase: 'aq',

@@ -201,7 +201,7 @@ export class Lab {
   }
 
   // ------------------------------------------------------------------ core mixing routine
-  private mix(dest: Vessel, n: Map<string, number>, V: number, label: string, opts: { dissolving?: boolean; seconds?: number } = {}): ActionResult {
+  private mix(dest: Vessel, n: Map<string, number>, V: number, label: string, opts: { dissolving?: boolean; seconds?: number; temperature?: number } = {}): ActionResult {
     const before = snapshot(dest)
     const beforeAmounts = new Map(dest.n)
     const tracker = new Tracker(before)
@@ -215,7 +215,7 @@ export class Lab {
     for (let i = 0; i < steps; i++) {
       const part = new Map<string, number>()
       for (const [id, amt] of n) part.set(id, amt / steps)
-      dest.receive(part, V / steps)
+      dest.receive(part, V / steps, opts.temperature)
       dest.settle(this.time)
       dest.advance(dt, this.time)
       tracker.update(snapshot(dest))
@@ -300,7 +300,7 @@ export class Lab {
       for (const id of moved.n.keys()) if (this.added.get(from.id)?.has(id)) this.markAdded(dest, id)
     }
     const dissolving = !dest.wet && moved.V > 0 && [...dest.n.keys()].some((id) => SPECIES[id]?.phase === 's')
-    return this.mix(dest, moved.n, moved.V, label, { dissolving })
+    return this.mix(dest, moved.n, moved.V, label, { dissolving, temperature: from.T })
   }
 
   /** Split the liquid in a vessel equally into new vessels. */
@@ -520,9 +520,9 @@ export class Lab {
     const retained = Math.min(v.V, 0.3)
     const wet = v.takeFraction(v.V > 0 ? retained / v.V : 0, false)
     paper.receive(solids, 0)
-    paper.receive(wet.n, wet.V)
+    paper.receive(wet.n, wet.V, v.T)
     const filtrate = v.takeFraction(1, false)
-    const res = this.mix(dest, filtrate.n, filtrate.V, `Filter ${v.label}`)
+    const res = this.mix(dest, filtrate.n, filtrate.V, `Filter ${v.label}`, { temperature: v.T })
     for (const id of solids.keys()) this.markAdded(paper, id)
     paper.settle(this.time)
     const desc = drySolidDescription(paper)
@@ -530,13 +530,15 @@ export class Lab {
       { kind: 'filtrate', text: `The filtrate is ${dest.wet ? snapshot(dest).solution.name : 'absent'}.` },
       { kind: 'residue', text: desc ? `${cap(desc.name)} residue on the filter paper.` : 'No residue on the filter paper.' },
     ]
-    res.observations = obs
+    // record() shares this array with the journal: keep both views of the action consistent.
+    res.observations.splice(0, res.observations.length, ...obs)
     return { result: res, filtrateId: dest.id, residueId: paper.id }
   }
 
   /** Pour the contents away. A thin film of the old mixture stays behind unless rinsed. */
   empty(vesselId: string): ActionResult {
     const v = this.vessel(vesselId)
+    this.flushVessel(v.id)
     if (v.wet) {
       const keep = Math.min(1, 0.04 / v.V)
       const solidsKeep = 0.03
@@ -549,6 +551,7 @@ export class Lab {
       for (const [id, amt] of [...v.n]) v.change(id, -amt * 0.98)
     }
     v.headspace.clear()
+    v.bubbleRate = 0
     v.condensation = 0
     return this.record({ vesselId: v.id, action: 'Empty the tube', observations: [], time: this.time })
   }
@@ -556,9 +559,11 @@ export class Lab {
   /** Empty and rinse with distilled water (leaves a negligible trace and a few drops of water). */
   rinse(vesselId: string): ActionResult {
     const v = this.vessel(vesselId)
+    this.flushVessel(v.id)
     for (const [id, amt] of [...v.n]) v.change(id, -amt * 0.9995)
     v.V = 0.03
     v.headspace.clear()
+    v.bubbleRate = 0
     v.condensation = 0
     v.settled = 0
     this.added.set(v.id, new Set())
@@ -579,7 +584,8 @@ export class Lab {
   begin(vesselId: string, label: string, opts: { heating?: boolean } = {}): OpenAction {
     const v = this.vessel(vesselId)
     // an earlier action on this vessel that is still settling is written up first
-    for (const a of [...this.actions]) if (a.vesselId === v.id) this.finish(a)
+    // Heating and adding chemicals may happen together. Only replace actions of the same kind.
+    for (const a of [...this.actions]) if (a.vesselId === v.id && a.heating === !!opts.heating) this.finish(a)
     const before = snapshot(v)
     const a: OpenAction = {
       vesselId: v.id,
@@ -613,6 +619,10 @@ export class Lab {
     for (const a of [...this.actions]) this.finish(a)
   }
 
+  private flushVessel(id: string) {
+    for (const a of [...this.actions]) if (a.vesselId === id) this.finish(a)
+  }
+
   isOpen(a: OpenAction) {
     return this.actions.includes(a)
   }
@@ -642,7 +652,7 @@ export class Lab {
   }
 
   /** Take up to `cm3` of liquid (or the equivalent amount of solid) from a source. */
-  private take(src: Source, cm3: number): { n: Map<string, number>; V: number; solidFromVessel: boolean } {
+  private take(src: Source, cm3: number): { n: Map<string, number>; V: number; solidFromVessel: boolean; temperature?: number } {
     if ('reagentId' in src) {
       const r = REAGENTS[src.reagentId]
       if (!r || r.kind !== 'solution') throw new Error(`${src.reagentId} cannot be poured`)
@@ -654,7 +664,7 @@ export class Lab {
     if (from.wet) {
       const V = Math.min(from.V, cm3)
       const moved = from.takeFraction(V / from.V, true)
-      return { ...moved, solidFromVessel: false }
+      return { ...moved, solidFromVessel: false, temperature: from.T }
     }
     // tipping a dry solid out of a tube
     const total = this.solidMass(from)
@@ -665,13 +675,13 @@ export class Lab {
     return { ...moved, solidFromVessel: true }
   }
 
-  private receiveInto(a: OpenAction, dest: Vessel, n: Map<string, number>, V: number) {
+  private receiveInto(a: OpenAction, dest: Vessel, n: Map<string, number>, V: number, temperature?: number) {
     if (V > 0 && !dest.wet && [...dest.n.keys()].some((id) => SPECIES[id]?.phase === 's')) a.dissolving = true
     for (const [id, amt] of n) {
       a.addedAmounts.set(id, (a.addedAmounts.get(id) ?? 0) + amt)
       if (SPECIES[id]?.phase === 's') this.markAdded(dest, id)
     }
-    dest.receive(n, V)
+    dest.receive(n, V, temperature)
     if (dest.V > dest.spec.capacity) {
       dest.takeFraction((dest.V - dest.spec.capacity) / dest.V, true)
       dest.log.push({ kind: 'overflow', amount: 0, time: this.time })
@@ -684,8 +694,9 @@ export class Lab {
   /** Pour part of a source into the vessel of an open action. Returns the volume (cm³) or mass (g) moved. */
   pourStep(a: OpenAction, src: Source, cm3: number): number {
     const dest = this.vessel(a.vesselId)
-    const { n, V, solidFromVessel } = this.take(src, cm3)
-    this.receiveInto(a, dest, n, V)
+    if (!this.isOpen(a) || dest.stoppered || !Number.isFinite(cm3) || cm3 <= 0) return 0
+    const { n, V, solidFromVessel, temperature } = this.take(src, cm3)
+    this.receiveInto(a, dest, n, V, temperature)
     if (!solidFromVessel) return V
     let g = 0
     for (const [id, amt] of n) g += (amt / 1000) * molarMassOf(id)
@@ -726,14 +737,15 @@ export class Lab {
   filterStep(a: OpenAction, src: Source, paperId: string, cm3: number): number {
     const paper = this.vessel(paperId)
     const dest = this.vessel(a.vesselId)
-    const { n, V } = this.take(src, cm3)
+    if (!this.isOpen(a) || dest.stoppered || !Number.isFinite(cm3) || cm3 <= 0) return 0
+    const { n, V, solidFromVessel, temperature } = this.take(src, cm3)
     for (const id of n.keys()) if (SPECIES[id]?.phase === 's') this.markAdded(paper, id)
-    paper.receive(n, V)
+    paper.receive(n, V, temperature)
     paper.settle(this.time)
     paper.settled = 1
     if (paper.V > 0.3) {
       const drained = paper.takeFraction((paper.V - 0.3) / paper.V, false)
-      this.receiveInto(a, dest, drained.n, drained.V)
+      this.receiveInto(a, dest, drained.n, drained.V, paper.T)
     } else a.tracker.update(snapshot(dest))
     if (!a.finalize) {
       a.finalize = (obs) => {
@@ -743,7 +755,7 @@ export class Lab {
         return out.concat(obs.filter((o) => o.kind === 'effervescence' || o.kind === 'gas'))
       }
     }
-    return V
+    return solidFromVessel ? [...n].reduce((g, [id, amt]) => g + amt / 1000 * molarMassOf(id), 0) : V
   }
 
   /** Heat a vessel (or stop heating it). Time passes with tick(). */
@@ -774,6 +786,7 @@ export class Lab {
     const name = paper === 'red-litmus' ? 'red litmus paper' : paper === 'blue-litmus' ? 'blue litmus paper' : 'universal indicator paper'
     let text: string
     if (!v.wet) text = `No change – there is no solution for the ${name} to test.`
+    else if (v.conc('Cl2(aq)') > 1e-4) text = `The ${name} is bleached (turns white).`
     else {
       const pH = estimatePH(v)
       if (paper === 'red-litmus') text = pH > 8 ? 'The red litmus paper turns blue.' : 'No change – the red litmus paper stays red.'
@@ -799,8 +812,14 @@ export class Lab {
     // soluble gases above a warm solution
     const nh3 = (vapourPressure(v, 'NH3') / 0.0025) * 0.0061
     const so2 = (vapourPressure(v, 'SO2(aq)') / 0.004) * 0.0061
-    if (nh3 > (out.get('NH3(g)') ?? 0)) out.set('NH3(g)', nh3)
-    if (so2 > (out.get('SO2(g)') ?? 0)) out.set('SO2(g)', so2)
+    for (const [gas, solute, demand] of [['NH3(g)', 'NH3', nh3], ['SO2(g)', 'SO2(aq)', so2]] as const) {
+      const existing = out.get(gas) ?? 0
+      const extra = Math.min(v.amount(solute) * 0.7, Math.max(0, demand - existing))
+      if (extra > 0) {
+        out.set(gas, existing + extra)
+        v.change(solute, -extra)
+      }
+    }
     return out
   }
 
