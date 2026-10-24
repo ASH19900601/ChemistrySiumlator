@@ -1,0 +1,77 @@
+{
+  "baseline": "d3839537f613009aa5b58a0fa120cc5b1ba00440",
+  "date": "2026-10-24",
+  "checks": {
+    "search:0620/52": 0,
+    "search:0620_s26_52": 1,
+    "search:9701/31": 0,
+    "filterAfterReturn": {
+      "year": "all",
+      "query": "",
+      "cards": 67
+    },
+    "refresh": {
+      "before": {
+        "vessels": 2,
+        "volume": 0.2
+      },
+      "returnedHome": 1,
+      "after": {
+        "vessels": 1,
+        "journal": 0
+      },
+      "answer": "A white precipitate was observed."
+    },
+    "keyboardTargets": {
+      "hasFlame": false,
+      "hasWaste": false,
+      "hasSink": false,
+      "total": 33
+    },
+    "resultRefresh": {
+      "before": "1 / 14",
+      "returnedHome": 1,
+      "storedMarks": {
+        "a": 1
+      },
+      "afterReentry": "0 / 14"
+    },
+    "mobilePutBack": {
+      "viewport": 390,
+      "x": 525,
+      "width": 87,
+      "visibleWithoutScrolling": false
+    },
+    "sourceZoom": {
+      "fit": {
+        "width": 360,
+        "scroll": 360
+      },
+      "afterOnePlus": {
+        "width": 360,
+        "scroll": 960
+      },
+      "zoomOutControls": 0
+    },
+    "sourceOnlyTicks": {
+      "benchVisible": 0,
+      "versionDelta": 11
+    },
+    "storageFailure": {
+      "alerts": 0,
+      "saveMessages": 0,
+      "answerAfterReload": ""
+    },
+    "stopperedTarget": {
+      "before": "bottle",
+      "after": "tube",
+      "notice": null,
+      "stoppered": true
+    },
+    "browserBack": {
+      "sameURL": true,
+      "returnedPreviousDocument": true,
+      "examVisible": false
+    }
+  }
+}
