@@ -5,13 +5,15 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "npm run check:papers && tsc -b && vite build",
+    "build": "node tools/check-paper-assets.mjs && tsc -b && vite build",
     "preview": "vite preview",
     "test": "vitest run",
     "typecheck": "tsc -b --noEmit",
     "test:browser": "playwright test",
     "prepare:papers": "python3 tools/prepare_past_papers.py",
-    "check:papers": "python3 tools/prepare_past_papers.py --check"
+    "check:papers": "python3 tools/prepare_past_papers.py --check",
+    "build:full": "npm run check:papers && npm run build",
+    "test:core-browser": "playwright test e2e/report-regressions.spec.ts"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -25,5 +27,8 @@
     "typescript": "^5.6.3",
     "vite": "^5.4.10",
     "vitest": "^2.1.4"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

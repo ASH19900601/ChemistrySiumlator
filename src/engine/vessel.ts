@@ -30,7 +30,7 @@ const HEAT_TARGET: Record<HeatMode, number> = { warm: 65, boil: 100, gentle: 260
 const BOIL_DRIVE = 125
 
 export interface EngineEvent {
-  kind: 'rule' | 'gas' | 'condensation' | 'overflow' | 'boil' | 'dry'
+  kind: 'rule' | 'gas' | 'condensation' | 'overflow' | 'boil' | 'dry' | 'solver-limit' | 'safety'
   ruleId?: string
   text?: string
   species?: string
@@ -71,9 +71,10 @@ export class Vessel {
   /** set when the vessel has been emptied but not rinsed: tiny residue remains */
   log: EngineEvent[] = []
 
-  constructor(kind: VesselKind, label?: string) {
+  constructor(kind: VesselKind, label?: string, id?: string) {
     this.kind = kind
-    this.id = `v${++vesselCounter}`
+    this.id = id ?? `v${++vesselCounter}`
+    if (id) vesselCounter = Math.max(vesselCounter, Number(id.slice(1)))
     this.label = label ?? VESSEL_SPECS[kind].label
   }
 
@@ -94,13 +95,14 @@ export class Vessel {
   }
 
   change(id: string, delta: number) {
+    if (!Number.isFinite(delta)) throw new RangeError('Chemical amounts must be finite')
     const v = (this.n.get(id) ?? 0) + delta
     if (v <= 1e-15) this.n.delete(id)
     else this.n.set(id, v)
   }
 
   clone(): Vessel {
-    const v = new Vessel(this.kind, this.label)
+    const v = new Vessel(this.kind, this.label, this.id)
     v.id = this.id
     v.n = new Map(this.n)
     v.V = this.V
@@ -121,6 +123,7 @@ export class Vessel {
 
   /** Remove a fraction of the liquid together with dissolved species and (suspended) solids. */
   takeFraction(f: number, includeSolids: boolean): { n: Map<string, number>; V: number } {
+    if (!Number.isFinite(f)) throw new RangeError('Transfer fraction must be finite')
     f = Math.max(0, Math.min(1, f))
     const out = new Map<string, number>()
     for (const [id, amt] of this.n) {
@@ -142,9 +145,10 @@ export class Vessel {
 
   /** Add material; overflow is reported by the caller. */
   receive(n: Map<string, number> | Record<string, number>, V: number, temperature = ROOM_T) {
+    const entries = n instanceof Map ? [...n.entries()] : Object.entries(n)
+    if (!Number.isFinite(V) || V < 0 || !Number.isFinite(temperature) || entries.some(([, n]) => !Number.isFinite(n) || n < 0)) throw new RangeError('Received amounts and volume must be finite and nonnegative')
     // A volume-weighted approximation; do not reset a transferred hot solution to room temperature.
     if (V > 0) this.T = (this.T * this.V + temperature * V) / (this.V + V)
-    const entries = n instanceof Map ? [...n.entries()] : Object.entries(n)
     for (const [id, amt] of entries) this.change(id, amt)
     this.V += V
   }
@@ -165,6 +169,7 @@ export class Vessel {
   settle(time: number) {
     if (!this.wet) return
     const ctx = this.ctx()
+    let converged = false
     // Sweep the rules in priority order until nothing changes. Within a sweep higher-priority
     // rules always act first (e.g. neutralisation before precipitation).
     for (let sweep = 0; sweep < 300; sweep++) {
@@ -176,13 +181,15 @@ export class Vessel {
         applyRule(rule, this, xi, time)
         changed = true
       }
-      if (!changed) break
+      if (!changed) { converged = true; break }
     }
+    if (!converged && this.log[this.log.length - 1]?.kind !== 'solver-limit') this.log.push({ kind: 'solver-limit', amount: 0, time, text: 'The reaction solver reached its iteration limit; this result may be incomplete.' })
     this.liberateGases(time)
   }
 
   /** Advance time by dt seconds: temperature, kinetics, gas loss, settling. */
   advance(dt: number, time: number) {
+    if (!Number.isFinite(dt) || dt < 0 || !Number.isFinite(time)) throw new RangeError('Elapsed time must be finite and nonnegative')
     let remaining = dt
     while (remaining > 1e-9) {
       const h = Math.min(remaining, remaining > 60 ? 4 : 1)
@@ -287,8 +294,17 @@ export class Vessel {
     this.log.push({ kind: 'gas', species: gas, amount, time })
   }
 
+  heatingProblem(mode: HeatMode | null): string | undefined {
+    if (!mode) return
+    if (this.stoppered) return 'Heating blocked: remove the stopper before heating a tube.'
+    if (mode === 'strong' && !this.spec.heatProof) return 'Strong heating blocked: use a boiling tube or hard-glass tube.'
+    if (this.kind === 'filter-paper') return 'Heating blocked: filter paper cannot be heated in the burner.'
+  }
+
   startHeating(mode: HeatMode | null) {
-    this.heating = mode
+    const problem = this.heatingProblem(mode)
+    this.heating = problem ? null : mode
+    return !problem
   }
 }
 
@@ -312,7 +328,7 @@ function ruleApplicable(rule: Rule, v: Vessel, ctx: RuleCtx): boolean {
 }
 
 function completeExtent(rule: Rule, v: Vessel): number {
-  let xi = Infinity
+  let xi = rule.limit ? rule.limit(v.ctx()) : Infinity
   for (const [s, nu] of Object.entries(rule.reactants)) {
     const reserve = rule.reserve?.[s] ? rule.reserve[s] * v.V : 0
     xi = Math.min(xi, (v.amount(s) - reserve) / nu)

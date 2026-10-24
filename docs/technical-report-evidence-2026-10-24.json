@@ -1,0 +1,280 @@
+{
+  "baselineCommit": "d4df1b1887e9a871a5e9cb4faaca4ebe7b9f33d8",
+  "before": {
+    "nitrate-1-2-30": {
+      "T": 51.44626046395092,
+      "NH3": 0.01973408342205417,
+      "before": "No change – the damp red litmus paper stays red.",
+      "test": "No change – the damp red litmus paper stays red."
+    },
+    "nitrate-1-2-60": {
+      "T": 60.91769210197645,
+      "NH3": 0.030160330990717434,
+      "before": "No change – the damp red litmus paper stays red.",
+      "test": "No change – the damp red litmus paper stays red."
+    },
+    "nitrate-1-2-120": {
+      "T": 64.62966138279413,
+      "NH3": 0.019094769050280683,
+      "before": "No change – the damp red litmus paper stays red.",
+      "test": "No change – the damp red litmus paper stays red."
+    },
+    "nitrate-1-3-30": {
+      "T": 51.44626046395092,
+      "NH3": 0.015273314615089996,
+      "before": "No change – the damp red litmus paper stays red.",
+      "test": "No change – the damp red litmus paper stays red."
+    },
+    "nitrate-1-3-60": {
+      "T": 60.91769210197645,
+      "NH3": 0.024271307631814766,
+      "before": "No change – the damp red litmus paper stays red.",
+      "test": "No change – the damp red litmus paper stays red."
+    },
+    "nitrate-1-3-120": {
+      "T": 64.62966138279413,
+      "NH3": 0.01732965841085901,
+      "before": "No change – the damp red litmus paper stays red.",
+      "test": "No change – the damp red litmus paper stays red."
+    },
+    "nitrate-2-2-30": {
+      "T": 51.44626046395092,
+      "NH3": 0.028606501280096928,
+      "before": "No change – the damp red litmus paper stays red.",
+      "test": "No change – the damp red litmus paper stays red."
+    },
+    "nitrate-2-2-60": {
+      "T": 60.91769210197645,
+      "NH3": 0.04584358549874444,
+      "before": "The damp red litmus paper turns blue.",
+      "test": "The damp red litmus paper turns blue."
+    },
+    "nitrate-2-2-120": {
+      "T": 64.62966138279413,
+      "NH3": 0.03359111839349834,
+      "before": "The damp red litmus paper turns blue.",
+      "test": "The damp red litmus paper turns blue."
+    },
+    "nitrate-2-3-30": {
+      "T": 51.44626046395092,
+      "NH3": 0.023608042571108063,
+      "before": "No change – the damp red litmus paper stays red.",
+      "test": "No change – the damp red litmus paper stays red."
+    },
+    "nitrate-2-3-60": {
+      "T": 60.91769210197645,
+      "NH3": 0.038657956524210314,
+      "before": "The damp red litmus paper turns blue.",
+      "test": "The damp red litmus paper turns blue."
+    },
+    "nitrate-2-3-120": {
+      "T": 64.62966138279413,
+      "NH3": 0.030268602064613584,
+      "before": "The damp red litmus paper turns blue.",
+      "test": "No change – the damp red litmus paper stays red."
+    },
+    "coldAmmonium": "The damp red litmus paper turns blue.",
+    "bufferedMg": "White precipitate forms.",
+    "salt": "The solid dissolves, giving a colourless solution.",
+    "saltConcentration": 102.66940451745381,
+    "negativeVolume": -5,
+    "closedAdd": "No visible change.",
+    "closedAddVolume": 1.0000000000000002,
+    "sealedHeat": "The water boils away, leaving a residue.",
+    "heatProof": "No visible change.",
+    "cloneIds": [
+      "v32",
+      "v32",
+      "v34"
+    ],
+    "copperDissolve": "The white precipitate dissolves, giving a blue solution. The solid dissolves, giving a blue solution.",
+    "KI": {
+      "before": 0.20090361445783134,
+      "after": 0.13769761007853282,
+      "iodineEvents": 0.003160300218964932
+    },
+    "ruleCount": 330,
+    "coverage": {
+      "guided": 9,
+      "configured": 18,
+      "source-only": 40
+    },
+    "supervisorTimes": [
+      {
+        "id": "0620_s24_51",
+        "ms": 53
+      },
+      {
+        "id": "0620_w24_52",
+        "ms": 84
+      },
+      {
+        "id": "0620_s23_51",
+        "ms": 89
+      },
+      {
+        "id": "0620_s24_52",
+        "ms": 32
+      },
+      {
+        "id": "9701_s25_31",
+        "ms": 64
+      },
+      {
+        "id": "9701_w24_34",
+        "ms": 25
+      },
+      {
+        "id": "9701_s24_33",
+        "ms": 215
+      },
+      {
+        "id": "9701_w23_31",
+        "ms": 121
+      },
+      {
+        "id": "9701_w23_35",
+        "ms": 102
+      }
+    ]
+  },
+  "after": {
+    "nitrate-1-2-30": {
+      "T": 51.44626046395092,
+      "NH3": 0.01973408342205417,
+      "before": "The damp red litmus paper turns blue.",
+      "test": "The damp red litmus paper turns blue."
+    },
+    "nitrate-1-2-60": {
+      "T": 60.91769210197645,
+      "NH3": 0.030160330990717434,
+      "before": "The damp red litmus paper turns blue.",
+      "test": "The damp red litmus paper turns blue."
+    },
+    "nitrate-1-2-120": {
+      "T": 64.62966138279413,
+      "NH3": 0.019093147544982685,
+      "before": "The damp red litmus paper turns blue.",
+      "test": "The damp red litmus paper turns blue."
+    },
+    "nitrate-1-3-30": {
+      "T": 51.44626046395092,
+      "NH3": 0.015273314615089996,
+      "before": "The damp red litmus paper turns blue.",
+      "test": "The damp red litmus paper turns blue."
+    },
+    "nitrate-1-3-60": {
+      "T": 60.91769210197645,
+      "NH3": 0.024271307631814766,
+      "before": "The damp red litmus paper turns blue.",
+      "test": "The damp red litmus paper turns blue."
+    },
+    "nitrate-1-3-120": {
+      "T": 64.62966138279413,
+      "NH3": 0.01732965841085901,
+      "before": "The damp red litmus paper turns blue.",
+      "test": "The damp red litmus paper turns blue."
+    },
+    "nitrate-2-2-30": {
+      "T": 51.44626046395092,
+      "NH3": 0.028606501280096928,
+      "before": "The damp red litmus paper turns blue.",
+      "test": "The damp red litmus paper turns blue."
+    },
+    "nitrate-2-2-60": {
+      "T": 60.91769210197645,
+      "NH3": 0.04584113904861169,
+      "before": "The damp red litmus paper turns blue.",
+      "test": "The damp red litmus paper turns blue."
+    },
+    "nitrate-2-2-120": {
+      "T": 64.62966138279413,
+      "NH3": 0.03358712925236122,
+      "before": "The damp red litmus paper turns blue.",
+      "test": "The damp red litmus paper turns blue."
+    },
+    "nitrate-2-3-30": {
+      "T": 51.44626046395092,
+      "NH3": 0.023608042571108063,
+      "before": "The damp red litmus paper turns blue.",
+      "test": "The damp red litmus paper turns blue."
+    },
+    "nitrate-2-3-60": {
+      "T": 60.91769210197645,
+      "NH3": 0.038655316575698394,
+      "before": "The damp red litmus paper turns blue.",
+      "test": "The damp red litmus paper turns blue."
+    },
+    "nitrate-2-3-120": {
+      "T": 64.62966138279413,
+      "NH3": 0.030265335559951163,
+      "before": "The damp red litmus paper turns blue.",
+      "test": "The damp red litmus paper turns blue."
+    },
+    "coldAmmonium": "The damp red litmus paper turns blue.",
+    "bufferedMg": "White precipitate forms.",
+    "salt": "Some of the solid dissolves; some solid remains.",
+    "saltConcentration": 6.1,
+    "negativeError": "RangeError: Amounts must be finite and positive; fractions must be at most one",
+    "negativeVolume": 0,
+    "closedAdd": "Error: Remove the stopper from test-tube 2 first",
+    "closedAddVolume": 0,
+    "sealedHeat": "Heating blocked: remove the stopper before heating a tube.",
+    "heatProof": "Strong heating blocked: use a boiling tube or hard-glass tube.",
+    "cloneIds": [
+      "v32",
+      "v32",
+      "v33"
+    ],
+    "copperDissolve": "The solid dissolves, giving a blue solution.",
+    "KI": {
+      "before": 0.20090361445783134,
+      "after": 0.19346712526702312,
+      "iodineEvents": 0.0037182445954041005
+    },
+    "ruleCount": 333,
+    "coverage": {
+      "guided": 9,
+      "configured": 18,
+      "source-only": 40
+    },
+    "supervisorTimes": [
+      {
+        "id": "0620_s24_51",
+        "ms": 67
+      },
+      {
+        "id": "0620_w24_52",
+        "ms": 75
+      },
+      {
+        "id": "0620_s23_51",
+        "ms": 103
+      },
+      {
+        "id": "0620_s24_52",
+        "ms": 36
+      },
+      {
+        "id": "9701_s25_31",
+        "ms": 86
+      },
+      {
+        "id": "9701_w24_34",
+        "ms": 32
+      },
+      {
+        "id": "9701_s24_33",
+        "ms": 411
+      },
+      {
+        "id": "9701_w23_31",
+        "ms": 164
+      },
+      {
+        "id": "9701_w23_35",
+        "ms": 189
+      }
+    ]
+  }
+}

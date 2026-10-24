@@ -37,6 +37,7 @@ describe.each(Object.entries(RECENT_BENCHES))('%s sample preparation', (id, defi
 function portion(id: string, sample: string, acid = false) {
   const lab = new Lab(RECENT_BENCHES[id])
   const v = lab.newVessel('test-tube')
+  lab.setStopper(sample, false)
   lab.transfer(sample, v.id, { fraction: 0.08 })
   if (!v.wet) lab.addReagent(v.id, acid ? 'HCl' : 'water', { cm3: 2 })
   return { lab, v }
@@ -119,4 +120,15 @@ test('fresh manganate water extract stays green initially and disproportionates 
   lab.addReagent(v.id, 'H2SO4', { cm3: 1 })
   expect(v.amount('MnO4-')).toBeGreaterThan(0.04)
   expect(v.amount('MnO2(s)')).toBeGreaterThan(0.02)
+})
+
+import { PARTIAL_REFERENCES } from '../../papers/source-parts'
+test.each(Object.entries(PARTIAL_REFERENCES))('%s configured bench has source-checked scoring parts and a representative reference', (id, reference) => {
+  const paper = PAPERS.find(p => p.id === id)!
+  expect(paper.coverage).toBe('configured')
+  expect(paper.parts.reduce((sum, p) => sum + p.marks, 0)).toBe(paper.totalMarks)
+  expect(new Set(paper.parts.map(p => p.id)).size).toBe(paper.parts.length)
+  const result = paper.supervisor(new Lab(paper))
+  expect(result[reference.part]).toMatch(reference.expected)
+  expect(Object.keys(result).every(key => paper.parts.some(p => p.id === key))).toBe(true)
 })

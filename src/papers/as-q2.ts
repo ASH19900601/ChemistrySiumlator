@@ -6,6 +6,7 @@ import type { PaperCase } from './types'
 const observations = (r: { observations: { text: string }[] }) => r.observations.map(o => o.text).join(' ')
 
 export function nitrogenAndManganese(lab: Lab): Record<string, string> {
+  for (const sample of lab.sampleDefs) lab.setStopper(sample.id, false)
   const portion = (sample: string, grams = 0.05, kind: 'test-tube' | 'hard-glass-tube' = 'test-tube') => {
     const tube = lab.newVessel(kind)
     lab.transfer(sample, tube.id, { grams })

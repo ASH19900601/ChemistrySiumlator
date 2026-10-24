@@ -154,6 +154,7 @@ const lab = new Lab({
 })
 
 const t = lab.newVessel('test-tube')
+lab.setStopper('X', false)
 lab.transfer(lab.sampleVessel('X').id, t.id, { depth: 1 })
 for (let i = 0; i < 5; i++) console.log(lab.addReagent(t.id, 'NH3', { drops: 1 }).observations)
 console.log(lab.addReagent(t.id, 'NH3', { cm3: 4 }).observations)   // 深蓝色溶液

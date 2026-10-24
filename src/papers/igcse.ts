@@ -49,6 +49,7 @@ export const P0620_s24_51: PaperCase = {
   ],
   identities: ['Solid E: homogeneous mixture of ammonium sulfate and chrome alum, KCr(SO₄)₂·12H₂O, 1 : 2 by mass (2 g).'],
   supervisor(lab: Lab) {
+    for (const sample of lab.sampleDefs) lab.setStopper(sample.id, false)
     const E = lab.sampleVessel('E')
     const h = lab.newVessel('boiling-tube', 'boiling tube (heat)')
     lab.transfer(E.id, h.id, { fraction: 0.5 })
@@ -113,6 +114,7 @@ export const P0620_w24_52: PaperCase = {
     'Solid N: ammonium carbonate, (NH₄)₂CO₃ (2 g).',
   ],
   supervisor(lab: Lab) {
+    for (const sample of lab.sampleDefs) lab.setStopper(sample.id, false)
     const M = lab.sampleVessel('M')
     const a = t(lab.flameTest(M.id))
     const bt = lab.newVessel('boiling-tube', 'boiling tube M')
@@ -180,6 +182,7 @@ export const P0620_s23_51: PaperCase = {
   ],
   identities: ['Solid E: ammonium iron(III) sulfate, NH₄Fe(SO₄)₂·12H₂O (iron alum), 2.5 g.'],
   supervisor(lab: Lab) {
+    for (const sample of lab.sampleDefs) lab.setStopper(sample.id, false)
     const E = lab.sampleVessel('E')
     const h = lab.newVessel('boiling-tube')
     lab.transfer(E.id, h.id, { fraction: 0.5 })
@@ -254,6 +257,7 @@ export const P0620_s24_52: PaperCase = {
   ],
   identities: ['Solid H: barium carbonate, BaCO₃ (0.5 g).', 'Solid I: ammonium chloride, NH₄Cl (1 g).'],
   supervisor(lab: Lab) {
+    for (const sample of lab.sampleDefs) lab.setStopper(sample.id, false)
     const H = lab.sampleVessel('H')
     const ai = t(lab.addReagent(H.id, 'HCl', { cm3: 10 }), lab.gasTest(H.id, 'limewater'))
     const ids = lab.divide(H.id, ['test-tube', 'test-tube', 'test-tube', 'test-tube']).vesselIds
@@ -268,8 +272,10 @@ export const P0620_s24_52: PaperCase = {
     lab.heat(g1, 'warm', 40)
     const g = t(lab.gasTest(g1, 'damp-red-litmus'), lab.gasTest(g1, 'damp-blue-litmus'))
     const hi = t(lab.addReagent(h1, 'HNO3', { depth: 1 }), lab.addReagent(h1, 'AgNO3', { drops: 5 }))
+    const ammonia = lab.addReagent(h1, 'NH3', { depth: 4 })
     lab.setStopper(h1, true)
-    const hii = t(lab.addReagent(h1, 'NH3', { depth: 4 }), lab.shake(h1))
+    const hii = t(ammonia, lab.shake(h1))
+    lab.setStopper(h1, false)
     const i = t(lab.pHTest(i1))
     return { 'a-i': ai, b, 'c-i': c, d, e, g, 'h-i': hi, 'h-ii': hii, i }
   },

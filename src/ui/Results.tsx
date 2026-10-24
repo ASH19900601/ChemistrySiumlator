@@ -1,29 +1,40 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Lab, type JournalEntry } from '../engine'
+import { useEffect, useState } from 'react'
+import { type JournalEntry } from '../engine'
 import type { PaperCase } from '../papers'
 import { answerKeys, PaperHeader, Prose, type Answers } from './PaperPane'
-import { isMarks, load, save } from './storage'
+import { save, downloadText } from './storage'
+import { writeAttempt, type Attempt } from './attempts'
 import { SourceDocument } from './SourceDocument'
 
 export function Results({
   paper,
+  attempt,
   answers,
   journal,
   onRetry,
   onHome,
 }: {
   paper: PaperCase
+  attempt: Attempt
   answers: Answers
   journal: JournalEntry[]
   onRetry: () => void
   onHome: () => void
 }) {
-  const [marks, setMarks] = useState<Record<string, number>>(() => load(`marks:${paper.id}`, {}, isMarks))
-  useEffect(() => save(`marks:${paper.id}`, marks), [paper.id, marks])
+  const [marks, setMarks] = useState<Record<string, number>>(() => attempt.marks)
+  const [saved, setSaved] = useState(true)
+  useEffect(() => { setSaved(writeAttempt({ ...attempt, stage: 'results', marks }) && save(`marks:${paper.id}`, marks)) }, [paper.id, marks, attempt])
   const total = paper.parts.reduce((s, p) => s + Math.min(p.marks, marks[p.id] ?? 0), 0)
-  const supervisor = useMemo(() => {
-    const lab = new Lab({ samples: paper.samples, reagents: paper.reagents })
-    return paper.supervisor(lab)
+  const marked = paper.parts.filter(p => marks[p.id] !== undefined).length
+  const [supervisor, setSupervisor] = useState<Record<string, string>>({})
+  const [referenceError, setReferenceError] = useState(false)
+  useEffect(() => {
+    if (paper.coverage === 'source-only') return
+    const worker = new Worker(new URL('../papers/supervisor.worker.ts', import.meta.url), { type: 'module' })
+    worker.onmessage = event => { if (event.data.error) setReferenceError(true); else setSupervisor(event.data.results); worker.terminate() }
+    worker.onerror = () => { setReferenceError(true); worker.terminate() }
+    worker.postMessage(paper.id)
+    return () => worker.terminate()
   }, [paper])
   const [showLog, setShowLog] = useState(false)
 
@@ -42,17 +53,24 @@ export function Results({
         </div>
       </header>
 
+      <div className="save-status" role={saved ? 'status' : 'alert'}>
+        <span>{saved ? 'Marks saved on this device' : 'Could not save your marks. Export a backup before leaving.'}</span>
+        <button className="btn" onClick={() => downloadText(`${paper.id}-attempt.json`, JSON.stringify({ ...attempt, stage: 'results', marks }, null, 2))}>Export backup</button>
+      </div>
+      <p className="mark-progress" role="status">Marked {marked} / {paper.parts.length} parts{marked < paper.parts.length ? ' · Total is provisional: unmarked parts are not zero marks.' : ''}</p>
+      {referenceError && <p role="alert">Simulation reference could not load. Use the original mark scheme below.</p>}
+      {paper.coverage === 'configured' && <p className="paper-note">Free bench practice: reference checks cover selected parts; the full supervisor procedure is not verified. Mark your written work against the original scheme.</p>}
       <div className="results-body">
         <article className="paper">
           <PaperHeader paper={paper} />
           <p className="hint">
-            Compare each answer with the published mark scheme and award yourself the marks you have earned. The supervisor's results show what this
-            simulation produces when the instructions are followed exactly.
+            Compare each answer with the published mark scheme and award yourself the marks you have earned. Simulation references cover the parts shown below; partial benches do not provide a complete supervisor procedure.
           </p>
           {paper.parts.map((p) => {
             const keys = answerKeys(p)
             return (
               <section key={p.id} className="mark-part">
+                {marks[p.id] === undefined && <span className="unmarked">Not yet marked</span>}
                 <div className="q-row">
                   <span className="q-label">{p.label}</span>
                   <div className="q-body">
@@ -80,7 +98,7 @@ export function Results({
                     </div>
                     {supervisor[p.id] && (
                       <div className="supervisor">
-                        <div className="mini-head">Supervisor's results (simulation)</div>
+                        <div className="mini-head">{paper.coverage === 'guided' ? "Supervisor's results (simulation)" : 'Representative reference (partial simulation)'}</div>
                         <Prose text={supervisor[p.id]} />
                       </div>
                     )}

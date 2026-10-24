@@ -111,6 +111,17 @@ function amountLabel(a: Amount): string {
 }
 const round = (x: number) => Math.round(x * 100) / 100
 
+export interface LabState {
+  time: number
+  samples: [string, string][]
+  added: [string, string[]][]
+  labelCounters: Partial<Record<VesselKind, number>>
+  journal: JournalEntry[]
+  vessels: (Pick<Vessel, 'id' | 'kind' | 'label' | 'V' | 'T' | 'stoppered' | 'bubbleRate' | 'condensation' | 'settled' | 'age'> & {
+    n: [string, number][]; headspace: [string, number][]
+  })[]
+}
+
 export class Lab {
   time = 0
   vessels = new Map<string, Vessel>()
@@ -126,6 +137,62 @@ export class Lab {
     this.sampleDefs = opts.samples ?? []
     this.reagentIds = opts.reagents ?? Object.keys(REAGENTS)
     for (const s of this.sampleDefs) this.loadSample(s)
+  }
+
+  /** A passive copy: current gestures are written up on the copy, never replayed on restore. */
+  toState(): LabState {
+    const copy = new Lab()
+    copy.time = this.time
+    copy.vessels = new Map([...this.vessels].map(([id, v]) => {
+      const clone = v.clone()
+      clone.log = [...v.log]
+      return [id, clone]
+    }))
+    copy.added = new Map([...this.added].map(([id, set]) => [id, new Set(set)]))
+    copy.journal = [...this.journal]
+    copy.actions = this.actions.map(a => ({ ...a }))
+    copy.flush()
+    return {
+      time: copy.time, samples: [...this.samples], added: [...copy.added].map(([id, set]) => [id, [...set]]),
+      labelCounters: { ...this.labelCounters },
+      journal: copy.journal.map(entry => ({ ...entry })),
+      vessels: [...copy.vessels.values()].map(v => ({ id: v.id, kind: v.kind, label: v.label,
+        n: [...v.n], V: v.V, T: v.T, stoppered: v.stoppered, headspace: [...v.headspace],
+        bubbleRate: v.bubbleRate, condensation: v.condensation, settled: v.settled, age: v.age })),
+    }
+  }
+
+  static fromState(state: LabState, opts: { samples: SampleDef[]; reagents: string[] }): Lab {
+    const lab = new Lab()
+    const finite = (n: number) => typeof n === 'number' && Number.isFinite(n)
+    const nonnegative = (n: number) => finite(n) && n >= 0
+    const amounts = (entries: [string, number][]) => {
+      if (!Array.isArray(entries) || !entries.every(e => Array.isArray(e) && e.length === 2 && SPECIES[e[0]] && nonnegative(e[1]))) throw new Error('Invalid saved chemicals')
+      return new Map(entries)
+    }
+    if (!nonnegative(state.time) || !Array.isArray(state.vessels) || !Array.isArray(state.journal) || !Array.isArray(state.samples) || !Array.isArray(state.added)) throw new Error('Invalid saved experiment')
+    for (const saved of state.vessels) {
+      if (!/^v\d+$/.test(saved.id) || lab.vessels.has(saved.id) || !['test-tube', 'boiling-tube', 'hard-glass-tube', 'filter-paper'].includes(saved.kind) || typeof saved.label !== 'string' || !nonnegative(saved.V) || !finite(saved.T) || typeof saved.stoppered !== 'boolean' || ![saved.bubbleRate, saved.condensation, saved.settled, saved.age].every(nonnegative)) throw new Error('Invalid saved vessel')
+      const v = new Vessel(saved.kind, saved.label, saved.id)
+      Object.assign(v, { V: saved.V, T: saved.T, stoppered: saved.stoppered, bubbleRate: saved.bubbleRate, condensation: saved.condensation, settled: saved.settled, age: saved.age })
+      v.n = amounts(saved.n)
+      v.headspace = amounts(saved.headspace)
+      lab.vessels.set(v.id, v)
+    }
+    if (!state.samples.every(([sample, id]) => opts.samples.some(s => s.id === sample) && lab.vessels.has(id)) || state.samples.length !== opts.samples.length || new Set(state.samples.map(([id]) => id)).size !== opts.samples.length) throw new Error('Saved samples do not match this question')
+    if (!state.journal.every(j => typeof j.action === 'string' && typeof j.vesselLabel === 'string' && nonnegative(j.time) && Array.isArray(j.observations) && j.observations.every(o => typeof o.kind === 'string' && typeof o.text === 'string'))) throw new Error('Invalid saved journal')
+    lab.time = state.time
+    lab.samples = new Map(state.samples)
+    lab.sampleDefs = opts.samples
+    lab.reagentIds = opts.reagents
+    lab.journal = state.journal.map(j => ({ ...j, observations: j.observations.map(o => ({ ...o })) }))
+    lab.added = new Map(state.added.map(([id, species]) => {
+      if (!lab.vessels.has(id) || !Array.isArray(species) || !species.every(s => SPECIES[s])) throw new Error('Invalid saved solids')
+      return [id, new Set(species)]
+    }))
+    for (const id of lab.vessels.keys()) if (!lab.added.has(id)) lab.added.set(id, new Set())
+    lab.labelCounters = Object.fromEntries(Object.entries(state.labelCounters).filter(([kind, count]) => ['test-tube', 'boiling-tube', 'hard-glass-tube', 'filter-paper'].includes(kind) && nonnegative(count)))
+    return lab
   }
 
   // ------------------------------------------------------------------ setup
@@ -188,6 +255,7 @@ export class Lab {
 
   /** Real time passing on the bench (not recorded in the journal). */
   tick(dt: number) {
+    if (!Number.isFinite(dt) || dt < 0) throw new RangeError('Elapsed time must be finite and nonnegative')
     this.elapse(dt)
     for (const a of [...this.actions]) {
       const v = this.vessels.get(a.vesselId)
@@ -252,9 +320,26 @@ export class Lab {
     throw new Error(`Amount ${JSON.stringify(a)} is not a liquid amount`)
   }
 
+  private requireOpen(v: Vessel) {
+    if (v.stoppered) throw new Error(`Remove the stopper from ${v.label} first`)
+  }
+
+  private validateAmount(amount: Amount) {
+    if (!amount || Object.keys(amount).length !== 1) throw new RangeError('Specify exactly one amount')
+    for (const [key, value] of Object.entries(amount)) {
+      if (key === 'spatula' && (value === 'small' || value === 'normal')) continue
+      if (key === 'all' && value === true) continue
+      if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0 || (key === 'fraction' && value > 1)) {
+        throw new RangeError('Amounts must be finite and positive; fractions must be at most one')
+      }
+    }
+  }
+
   // ------------------------------------------------------------------ actions
   addReagent(vesselId: string, reagentId: string, amount: Amount): ActionResult {
     const dest = this.vessel(vesselId)
+    this.requireOpen(dest)
+    this.validateAmount(amount)
     const r: ReagentDef | undefined = REAGENTS[reagentId]
     if (!r) throw new Error(`Unknown reagent ${reagentId}`)
     const label = `Add ${amountLabel(amount)} of ${r.label}`
@@ -279,6 +364,10 @@ export class Lab {
   transfer(fromId: string, toId: string, amount: Amount): ActionResult {
     const from = this.vessel(fromId)
     const dest = this.vessel(toId)
+    this.requireOpen(from)
+    this.requireOpen(dest)
+    this.validateAmount(amount)
+    if (from === dest) throw new Error('Use different source and destination vessels')
     let moved: { n: Map<string, number>; V: number }
     let label: string
     if (from.wet) {
@@ -329,6 +418,9 @@ export class Lab {
 
   heat(vesselId: string, mode: HeatMode, seconds = 30): ActionResult {
     const v = this.vessel(vesselId)
+    if (!Number.isFinite(seconds) || seconds <= 0) throw new RangeError('Heating time must be finite and positive')
+    const problem = v.heatingProblem(mode)
+    if (problem) return this.record({ vesselId: v.id, action: 'Heating blocked', observations: [{ kind: 'event', text: problem }], time: this.time })
     const before = snapshot(v)
     const beforeDryName = v.wet ? undefined : drySolidDescription(v)?.name
     const tracker = new Tracker(before)
@@ -354,6 +446,7 @@ export class Lab {
 
   /** Let time pass (all vessels). Observations are reported for `vesselId` if given. */
   wait(seconds: number, vesselId?: string): ActionResult {
+    if (!Number.isFinite(seconds) || seconds < 0) throw new RangeError('Waiting time must be finite and nonnegative')
     const v = vesselId ? this.vessel(vesselId) : undefined
     const before = v ? snapshot(v) : undefined
     const tracker = before ? new Tracker(before) : undefined
@@ -400,9 +493,15 @@ export class Lab {
   /** Hold a test at the mouth of the tube for a few seconds. */
   gasTest(vesselId: string, test: GasTest): ActionResult {
     const v = this.vessel(vesselId)
-    v.advance(4, this.time)
-    this.elapse(4, v)
-    const text = this.gasReading(v.id, test)
+    // The paper is exposed throughout the four seconds: a positive colour change does not
+    // disappear just because the tube cools before it is withdrawn.
+    let text = this.gasReading(v.id, test)
+    for (let i = 0; i < 4; i++) {
+      v.advance(1, this.time)
+      this.elapse(1, v)
+      const reading = this.gasReading(v.id, test)
+      if (!/No change|No pop/.test(reading)) text = reading
+    }
     return this.record({ vesselId: v.id, action: `Test the gas with ${GAS_TEST_LABELS[test]}`, observations: [{ kind: 'gas-test', text }], time: this.time })
   }
 
@@ -411,7 +510,7 @@ export class Lab {
     const v = this.vessel(vesselId)
     const g = (id: string) => v.headspace.get(id) ?? 0
     // soluble gases: head-space gas from heating solids, or vapour above a solution
-    const nh3 = Math.max(g('NH3(g)') / 0.006, vapourPressure(v, 'NH3') / 0.0025) * 0.0061
+    const nh3 = Math.max(g('NH3(g)') / 0.006, vapourPressure(v, 'NH3') / 0.0008) * 0.0061
     const so2 = Math.max(g('SO2(g)') / 0.006, vapourPressure(v, 'SO2(aq)') / 0.004) * 0.0061
     const co2 = g('CO2(g)')
     const o2 = g('O2(g)')
@@ -507,7 +606,9 @@ export class Lab {
   /** Filter: liquid goes to `filtrateVesselId` (new test-tube if omitted), solids stay on the paper. */
   filter(vesselId: string, filtrateVesselId?: string): { result: ActionResult; filtrateId: string; residueId: string } {
     const v = this.vessel(vesselId)
+    this.requireOpen(v)
     const dest = filtrateVesselId ? this.vessel(filtrateVesselId) : this.newVessel('test-tube', `filtrate from ${v.label}`)
+    this.requireOpen(dest)
     const paper = this.newVessel('filter-paper', `residue from ${v.label}`)
     // solids stay on the paper with a little liquid
     const solids = new Map<string, number>()
@@ -760,7 +861,7 @@ export class Lab {
 
   /** Heat a vessel (or stop heating it). Time passes with tick(). */
   setHeating(vesselId: string, mode: HeatMode | null) {
-    this.vessel(vesselId).startHeating(mode)
+    return this.vessel(vesselId).startHeating(mode)
   }
 
   /** Shake the tube (the change is written up after a few seconds). */
@@ -810,7 +911,7 @@ export class Lab {
       v.headspace.set(g, amt - take)
     }
     // soluble gases above a warm solution
-    const nh3 = (vapourPressure(v, 'NH3') / 0.0025) * 0.0061
+    const nh3 = (vapourPressure(v, 'NH3') / 0.0008) * 0.0061
     const so2 = (vapourPressure(v, 'SO2(aq)') / 0.004) * 0.0061
     for (const [gas, solute, demand] of [['NH3(g)', 'NH3', nh3], ['SO2(g)', 'SO2(aq)', so2]] as const) {
       const existing = out.get(gas) ?? 0

@@ -5,16 +5,24 @@ import { Bench } from './bench/Bench'
 import { BenchModel } from './bench/model'
 import { setSoundEnabled, sound } from './bench/sound'
 import { PaperPane, type Answers } from './PaperPane'
-import { isAnswers, load, save } from './storage'
+import { isAnswers, load, save, downloadText } from './storage'
+import { benchState, restoreBench, writeAttempt, type Attempt } from './attempts'
+import { ConfirmDialog } from './ConfirmDialog'
 
 type Tab = 'lab' | 'paper' | 'notes'
 
-export function Exam({ paper, onFinish, onExit }: { paper: PaperCase; onFinish: (answers: Answers, lab: Lab) => void; onExit: () => void }) {
+export function Exam({ paper, attempt, onFinish, onExit }: { paper: PaperCase; attempt: Attempt; onFinish: (attempt: Attempt) => void; onExit: () => void }) {
   const modelRef = useRef<BenchModel>()
-  if (!modelRef.current) modelRef.current = new BenchModel(new Lab({ samples: paper.samples, reagents: paper.reagents }), paper)
+  const restoreError = useRef('')
+  if (!modelRef.current && paper.coverage !== 'source-only') {
+    try { modelRef.current = restoreBench(paper, attempt.bench) }
+    catch { restoreError.current = 'This experiment snapshot is damaged. Your written work can still be exported. Start a new attempt from the marking page to reset the bench.'; modelRef.current = restoreBench(paper) }
+  }
   const model = modelRef.current
+  const emptyLab = useRef<Lab>()
+  if (!emptyLab.current) emptyLab.current = new Lab()
   if (import.meta.env.DEV) (window as unknown as { __bench?: BenchModel }).__bench = model
-  const lab = model.lab
+  const lab = model?.lab ?? emptyLab.current
   const [version, setVersion] = useState(0)
   const [tab, setTab] = useState<Tab>(paper.coverage === 'source-only' ? 'paper' : 'lab')
   const [sideTab, setSideTab] = useState<'paper' | 'notes'>('paper')
@@ -22,20 +30,45 @@ export function Exam({ paper, onFinish, onExit }: { paper: PaperCase; onFinish: 
   const [showText, setShowText] = useState<boolean>(() => load('show-text', false))
   const [soundOn, setSoundOn] = useState<boolean>(() => load('sound', true))
   const [demo, setDemo] = useState<boolean>(() => !load('demo-seen', false))
-  const [answers, setAnswers] = useState<Answers>(() => load(`answers:${paper.id}`, {}, isAnswers))
-  const [notes, setNotes] = useState<string>(() => load(`notes:${paper.id}`, ''))
-  const [started] = useState(() => Date.now())
+  const [answers, setAnswers] = useState<Answers>(() => isAnswers(attempt.answers) ? attempt.answers : load(`answers:${paper.id}`, {}, isAnswers))
+  const [notes, setNotes] = useState<string>(() => attempt.notes)
+  const [started] = useState(() => Date.now() - attempt.elapsed * 1000)
+  const [paused, setPaused] = useState(!!attempt.bench)
+  const [saved, setSaved] = useState(true)
+  const [confirmFinish, setConfirmFinish] = useState(false)
 
-  useEffect(() => save('show-text', showText), [showText])
+  useEffect(() => { save('show-text', showText) }, [showText])
   useEffect(() => {
     save('sound', soundOn)
     setSoundEnabled(soundOn)
   }, [soundOn])
-  useEffect(() => save(`answers:${paper.id}`, answers), [paper.id, answers])
-  useEffect(() => save(`notes:${paper.id}`, notes), [paper.id, notes])
+  const current = useRef({ answers, notes, stage: 'exam' as 'exam' | 'results' })
+  current.current.answers = answers
+  current.current.notes = notes
+  const persist = useRef<() => Attempt>(() => attempt)
+  persist.current = () => {
+    const record: Attempt = { ...attempt, answers: current.current.answers, notes: current.current.notes,
+      stage: current.current.stage, elapsed: Math.floor((Date.now() - started) / 1000), savedAt: Date.now(),
+      bench: restoreError.current ? attempt.bench : model ? benchState(model) : undefined }
+    const ok = writeAttempt(record)
+    const answerOK = save(`answers:${paper.id}`, record.answers)
+    const notesOK = save(`notes:${paper.id}`, record.notes)
+    setSaved(ok && answerOK && notesOK)
+    return record
+  }
+  useEffect(() => { persist.current() }, [answers, notes])
+  useEffect(() => {
+    const timer = setInterval(() => { persist.current() }, 2000)
+    const leave = () => { model?.cancel(); persist.current() }
+    const hide = () => { if (document.hidden) leave() }
+    window.addEventListener('pagehide', leave)
+    document.addEventListener('visibilitychange', hide)
+    return () => { clearInterval(timer); window.removeEventListener('pagehide', leave); document.removeEventListener('visibilitychange', hide); leave() }
+  }, [model])
 
   // the bench runs in real time (the wall clock on the bench can be sped up ×10)
   useEffect(() => {
+    if (!model || paused) return
     let last = performance.now()
     const t = setInterval(() => {
       const now = performance.now()
@@ -53,9 +86,13 @@ export function Exam({ paper, onFinish, onExit }: { paper: PaperCase; onFinish: 
       model.cancel()
       sound.stopPour()
     }
-  }, [model])
+  }, [model, paused])
 
-  const changeTab = (next: Tab) => { model.cancel(); setTab(next) }
+  useEffect(() => {
+    const timer = setInterval(() => setVersion(v => v + 1), 1000)
+    return () => clearInterval(timer)
+  }, [])
+  const changeTab = (next: Tab) => { model?.cancel(); setTab(next) }
 
   const endDemo = useCallback(() => {
     setDemo(false)
@@ -65,11 +102,13 @@ export function Exam({ paper, onFinish, onExit }: { paper: PaperCase; onFinish: 
   const elapsed = Math.floor((Date.now() - started) / 1000)
   const clock = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`
 
-  const finish = useCallback(() => {
-    if (!confirm('Finish the question and go to self-marking?')) return
-    model.finishAll()
-    onFinish(answers, lab)
-  }, [model, onFinish, answers, lab])
+  const finish = useCallback(() => setConfirmFinish(true), [])
+  const finishConfirmed = () => {
+    model?.finishAll()
+    current.current.stage = 'results'
+    const record = persist.current()
+    onFinish(record)
+  }
   const setAnswer = useCallback((k: string, v: string) => setAnswers(a => ({ ...a, [k]: v })), [])
 
   // the latest observation, shown on the bench only when observation text is switched on
@@ -101,8 +140,8 @@ export function Exam({ paper, onFinish, onExit }: { paper: PaperCase; onFinish: 
 
   return (
     <div className={`exam${paper.coverage === 'source-only' ? ' source-only' : ''}`}>
-      <header className="topbar">
-        <button className="icon-btn" onClick={() => confirm('Leave this question? The bench and experiment log will reset. Your written answers and rough notes are kept on this device.') && onExit()} aria-label="Back">
+      <div className="exam-heading"><header className="topbar">
+        <button className="icon-btn" onClick={() => { model?.cancel(); persist.current(); onExit() }} aria-label="Back">
           ←
         </button>
         <div className="tb-title">
@@ -132,9 +171,18 @@ export function Exam({ paper, onFinish, onExit }: { paper: PaperCase; onFinish: 
         </button>
       </header>
 
+      <div className={`save-status${saved ? '' : ' save-failed'}`} role={saved ? 'status' : 'alert'}>
+        <span>{saved ? 'Saved on this device' : 'Could not save on this device. Keep this page open and export a backup.'}</span>
+        {!saved && <button className="btn" onClick={() => persist.current()}>Retry saving</button>}
+        <button className="btn" onClick={() => downloadText(`${paper.id}-attempt.json`, JSON.stringify(persist.current(), null, 2))}>Export backup</button>
+      </div>
+      {restoreError.current && <p role="alert">{restoreError.current}</p>}
+      {paused && model && <div className="resume-notice" role="status">Saved experiment restored and paused. No chemistry ran while you were away. <button className="btn" onClick={() => setPaused(false)} disabled={!!restoreError.current}>Resume experiment</button></div>}
+      {confirmFinish && <ConfirmDialog title="Finish this question?" onCancel={() => setConfirmFinish(false)} onConfirm={finishConfirmed} />}
+      </div>
       <main className={`exam-main tab-${tab}${sideOpen ? '' : ' side-closed'}`}>
         <div className="pane pane-lab">
-          {paper.coverage !== 'source-only' && <Bench model={model} version={version} demo={demo} onDemoEnd={endDemo} />}
+          {model && <Bench model={model} version={version} demo={demo} onDemoEnd={endDemo} disabled={paused || !!restoreError.current} />}
           {showText && recent && (
             <div className="obs-caption" key={lab.journal.length}>
               <div className="obs-action">{recent.action}</div>

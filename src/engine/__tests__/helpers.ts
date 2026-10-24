@@ -1,11 +1,15 @@
 import { Lab, type Amount, type SampleDef } from '../lab'
 
 export function solutionLab(conc: Record<string, number>, volume = 20, reagents?: string[]) {
-  return new Lab({ samples: [{ id: 'X', label: 'X', kind: 'solution', solution: { conc, volume } }], reagents })
+  const lab = new Lab({ samples: [{ id: 'X', label: 'X', kind: 'solution', solution: { conc, volume } }], reagents })
+  lab.setStopper('X', false)
+  return lab
 }
 
 export function solidLab(solid: SampleDef['solid']) {
-  return new Lab({ samples: [{ id: 'S', label: 'S', kind: 'solid', solid }] })
+  const lab = new Lab({ samples: [{ id: 'S', label: 'S', kind: 'solid', solid }] })
+  lab.setStopper('S', false)
+  return lab
 }
 
 export const text = (r: { observations: { text: string }[] }) => r.observations.map((o) => o.text).join(' ')

@@ -30,9 +30,14 @@ export const PaperPane = memo(function PaperPane({ paper, answers, setAnswer, on
     <SourceDocument asset={paper.source.assets.question} title="Original question" originalPages={paper.source.qp_pages} />
     <p className="hint">Use the original question above. Label each written response with its part number. The mark scheme and confidential instructions are shown after you finish.</p>
     {paper.coverage === 'configured' && <p className="paper-note">Samples and reagents are prepared for free bench practice. Some reactions or apparatus may be unavailable; this paper has not been verified against every mark-scheme point.</p>}
-    <label className="source-answer"><span>Your answers to Question {paper.question}</span>
+    {paper.parts[0]?.id === 'response' ? <label className="source-answer"><span>Your answers to Question {paper.question}</span>
       <textarea className="answer lined" rows={18} value={answers.response ?? ''} onChange={e => setAnswer('response', e.target.value)} />
-    </label>
+    </label> : <>
+      {answers.response && <details><summary>Previous whole-question answer</summary><Prose text={answers.response} /></details>}
+      {paper.parts.map(part => <section className="q-part" key={part.id}>
+        <div className="q-row"><span className="q-label">{part.label}</span><div className="q-body"><AnswerInput part={part} answers={answers} setAnswer={setAnswer} /></div><span className="q-marks">[{part.marks}]</span></div>
+      </section>)}
+    </>}
     <div className="paper-foot"><button className="btn primary" onClick={onFinish}>Finish and mark my answers</button></div>
   </article>
   return (

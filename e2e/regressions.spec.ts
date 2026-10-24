@@ -23,6 +23,7 @@ test('R20 a new submission does not inherit a previous submission score', async 
   await start(page)
   page.on('dialog', d => d.accept())
   await page.getByRole('button', { name: 'Finish', exact: true }).click()
+  await page.getByRole('button', { name: 'Confirm finish', exact: true }).click()
   await expect(page.locator('.score-pill')).toHaveText('0 / 14')
 })
 
@@ -32,6 +33,7 @@ test('R21 written line breaks remain visible during self marking', async ({ page
   await input.fill('White precipitate\nDissolves in excess')
   page.on('dialog', d => d.accept())
   await page.getByRole('button', { name: 'Finish', exact: true }).click()
+  await page.getByRole('button', { name: 'Confirm finish', exact: true }).click()
   const answer = page.locator('.ans-line span').filter({ hasText: 'White precipitate' }).last()
   expect(await answer.evaluate(el => getComputedStyle(el).whiteSpace)).toMatch(/pre/)
 })

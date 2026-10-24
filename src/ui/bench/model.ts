@@ -573,6 +573,8 @@ export class BenchModel {
       } else if (z) {
         this.moveHeldTo(h, z, pend.x, pend.y)
         this.drop(h, z)
+      } else if (pend.id?.startsWith('tube:') && this.lab.vessel(pend.id.slice(5)).stoppered && ['bottle', 'dropper', 'wash', 'tube', 'piece', 'spatula', 'funnel'].includes(h.item.k)) {
+        this.say('Remove the stopper from the receiving tube first.')
       } else if (!pend.id || !this.pickable(pend.id)) {
         this.putBack()
       } else {
@@ -612,11 +614,15 @@ export class BenchModel {
   }
 
   cancel() {
+    const item = this.held?.item
+    const loaded = item?.k === 'spatula' && item.load || item?.k === 'pipette' && item.gas
     this.press = null
     this.squeezing = null
     this.pending = null
     this.endPressing()
     this.putBack()
+    // Cancelling input stops the gesture but must not delete a loaded sample or collected gas.
+    if (loaded && item) this.held = { item, x: 80, y: 300, dragging: false, ox: 0, oy: 0 }
     this.bump()
   }
 
@@ -1127,16 +1133,12 @@ export class BenchModel {
       this.stopHeating()
       return
     }
+    const v = this.lab.vessel(id)
+    const problem = v.heatingProblem(mode)
+    if (problem) { this.stopHeating(); this.say(problem); return }
     const rank = mode === 'boil' || mode === 'strong' ? 2 : 1
     if (!this.heat || this.heat.vesselId !== id || !this.lab.isOpen(this.heat.action)) {
       this.stopHeating()
-      const v = this.lab.vessel(id)
-      if (v.stoppered) {
-        this.lab.setStopper(id, false)
-        const b = this.boxOf(id)!
-        this.effects.push({ kind: 'pop', x: b.cx, y: b.rim - 30, until: this.now + 600 })
-        sound.pop()
-      }
       this.heat = { action: this.lab.begin(id, 'Heat', { heating: true }), vesselId: id, mode, rank, start: this.lab.time }
     }
     if (mode !== this.heat.mode) this.heat.mode = mode
@@ -1340,6 +1342,20 @@ export class BenchModel {
 
   private say(text: string) {
     this.notice = { text, until: this.now + 2600 }
+  }
+
+  /** Accessible equivalent of bringing the held tool to a physical target. */
+  useTarget(zone: Zone) {
+    const h = this.held
+    if (!h) return this.say('Pick up an item first.')
+    if (zone.t === 'tube' && this.lab.vessel(zone.id).stoppered) return this.say('Remove the stopper from the receiving tube first.')
+    if (!this.accepts(h.item, zone)) return this.say('The held item cannot be used at that target.')
+    this.endPressing()
+    this.stopPour()
+    this.moveHeldTo(h, zone, h.x, h.y)
+    if (this.isContinuous(h.item, zone)) this.startPressing(zone, 1000)
+    else this.drop(h, zone)
+    this.bump()
   }
 
   /** Write up everything still open (before marking). */

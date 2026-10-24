@@ -75,14 +75,17 @@ const PlacedTubeInner = memo(function PlacedTubeInner({ id, a, x, y, s, badge }:
 const PlacedTube = ({ id, a, b, badge }: { id: string; a: Appearance; b: TubeBox; badge?: string }) => <PlacedTubeInner id={id} a={a} x={b.x} y={b.y} s={b.s} badge={badge} />
 const StaticRoom = memo(Room)
 
-export function Bench({ model, version, demo, onDemoEnd }: { model: BenchModel; version: number; demo: boolean; onDemoEnd: () => void }) {
+export function Bench({ model, version, demo, onDemoEnd, disabled = false }: { model: BenchModel; version: number; demo: boolean; onDemoEnd: () => void; disabled?: boolean }) {
   void version
   const m = model
+  const container = useRef<HTMLDivElement>(null)
+  useEffect(() => { if (container.current) container.current.inert = disabled }, [disabled])
   const lab = m.lab
   const wrap = useRef<HTMLDivElement>(null)
   const svg = useRef<SVGSVGElement>(null)
   const [size, setSize] = useState({ w: 0, h: 0 })
   const [zoom, setZoom] = useState<number | null>(null)
+  const [target, setTarget] = useState('')
   const [coarse] = useState(() => window.matchMedia('(pointer: coarse)').matches)
   const [, repaint] = useState(0)
   const paint = useRef(0)
@@ -121,7 +124,7 @@ export function Bench({ model, version, demo, onDemoEnd }: { model: BenchModel; 
   }, [])
 
   const onDown = (e: RPointerEvent<SVGSVGElement>) => {
-    if (e.button !== 0 || !e.isPrimary || pointer.current || demo) return
+    if (disabled || e.button !== 0 || !e.isPrimary || pointer.current || demo) return
     pointer.current = { id: e.pointerId, x: e.clientX, y: e.clientY }
     const id = (e.target as Element).getAttribute?.('data-hit')
     if (!id && !m.held && wrap.current) {
@@ -219,7 +222,11 @@ export function Bench({ model, version, demo, onDemoEnd }: { model: BenchModel; 
   else if (zone?.t === 'tube' && held && ['bottle', 'wash', 'tube', 'dropper'].includes(held.item.k)) marksFor = zone.id
 
   return (
-    <div className="bench-container">
+    <div className="bench-container" ref={container}>
+    <div className="held-status" aria-live="polite">
+      <span>{held ? `Holding: ${held.item.k === 'tube' ? lab.vessel(held.item.id).label : 'reagentId' in held.item ? REAGENTS[held.item.reagentId].label : held.item.k}` : 'Pick up apparatus to use it'}</span>
+      {held && <button className="btn" onClick={() => { m.putBack(); requestPaint() }}>Put back</button>}
+    </div>
     <div className="bench-wrap" ref={wrap}>
       <svg
         ref={svg}
@@ -336,7 +343,7 @@ export function Bench({ model, version, demo, onDemoEnd }: { model: BenchModel; 
                   m.up(x, y)
                   m.bump()
                   requestPaint()
-                } else if (e.key === 'Escape') m.cancel()
+                } else if (e.key === 'Escape') { m.cancel(); requestPaint() }
               }} />
           ))}
         </g>
@@ -353,8 +360,21 @@ export function Bench({ model, version, demo, onDemoEnd }: { model: BenchModel; 
       <button aria-label="Zoom out" onClick={() => setZoom(Math.max(0.25, scale - 0.15))}>−</button>
       <button aria-label="Fit bench" onClick={() => { setZoom(fit); wrap.current?.scrollTo(0, 0) }}>Fit</button>
       <button aria-label="Zoom in" onClick={() => setZoom(Math.min(1.5, scale + 0.15))}>+</button>
-      {held && <button onClick={() => { m.putBack(); requestPaint() }}>Put back</button>}
     </nav>
+    <details className="keyboard-controls">
+      <summary>Keyboard actions</summary>
+      <p>Tab to apparatus and press Enter to pick it up. Use these targets to complete each operation.</p>
+      <label>Target tube<select aria-label="Target tube" value={target} onChange={e => setTarget(e.target.value)}>
+        <option value="">Choose a tube</option>{[...lab.vessels.values()].filter(v => v.kind !== 'filter-paper').map(v => <option key={v.id} value={v.id}>{v.label}</option>)}
+      </select></label>
+      {(['mouth', 'liquid'] as const).map(part => <button key={part} className="btn" disabled={!lab.vessels.has(target)} onClick={() => { m.useTarget({ t: 'tube', id: target, part }); requestPaint() }}>{part === 'mouth' ? 'Use at tube mouth' : 'Dip into liquid'}</button>)}
+      <button className="btn" onClick={() => { m.useTarget({ t: 'nozzle' }); requestPaint() }}>Dampen test paper</button>
+      <button className="btn" onClick={() => { m.useTarget({ t: 'flame' }); requestPaint() }}>Bring tool to flame</button>
+      <button className="btn" onClick={() => { m.useTarget({ t: 'burner', zone: 'high' }); requestPaint() }}>Heat tube above flame</button>
+      <button className="btn" onClick={() => { m.useTarget({ t: 'burner', zone: 'low' }); requestPaint() }}>Heat tube in flame</button>
+      <button className="btn" onClick={() => { m.useTarget({ t: 'waste' }); requestPaint() }}>Empty held tube</button>
+      <button className="btn" onClick={() => { m.useTarget({ t: 'sink' }); requestPaint() }}>Rinse held tube</button>
+    </details>
     {m.notice && <div className="bench-notice" role="status">{m.notice.text}</div>}
     </div>
   )

@@ -103,7 +103,7 @@ c({ id: 'NH4Br', formula: 'NH₄Br', name: 'ammonium bromide', molarMass: 97.94,
   thermal: [{ minTemp: 300, halfLife: 15, products: { 'NH4Br-sublimate(s)': 1 }, events: ['white solid sublimes and collects on the cooler part of the tube', 'white fumes'] }] })
 c({ id: 'NH4NO3', formula: 'NH₄NO₃', name: 'ammonium nitrate', molarMass: 80.04, colour: '#fafafa', colourName: 'white',
   dissolves: { 'NH4+': 1, 'NO3-': 1 },
-  thermal: [{ minTemp: 170, halfLife: 20, products: { ...W(2) }, events: ['melts', 'colourless gas given off', ...hydrateEvents] }] })
+  thermal: [{ minTemp: 170, halfLife: 20, products: { 'N2O(g)': 1, ...W(2) }, events: ['melts', ...hydrateEvents] }] })
 c({ id: '(NH4)2SO4', formula: '(NH₄)₂SO₄', name: 'ammonium sulfate', molarMass: 132.1, colour: '#fafafa', colourName: 'white',
   dissolves: { 'NH4+': 2, 'SO4 2-': 1 },
   thermal: [{ minTemp: 280, halfLife: 40, products: { 'NH4HSO4(s)': 1, 'NH3(g)': 1 }, events: ['melts', 'white fumes'] }] })
@@ -159,7 +159,7 @@ c({ id: 'FeSO4.7H2O', formula: 'FeSO₄·7H₂O', name: 'iron(II) sulfate', mola
   ] })
 c({ id: '(NH4)2Fe(SO4)2.6H2O', formula: '(NH₄)₂Fe(SO₄)₂·6H₂O', name: 'ammonium iron(II) sulfate', molarMass: 392.1, colour: '#cfe3c4', colourName: 'pale green',
   dissolves: { 'NH4+': 2, 'Fe2+': 1, 'SO4 2-': 2 },
-  thermal: [{ minTemp: 100, halfLife: 15, products: { 'FeSO4(s)': 1, 'NH3(g)': 0.2, ...W(6) }, events: hydrateEvents }] })
+  thermal: [{ minTemp: 100, halfLife: 15, products: { 'Mohr-dry(s)': 1, ...W(6) }, events: hydrateEvents }] })
 c({ id: 'NH4Fe(SO4)2.12H2O', formula: 'NH₄Fe(SO₄)₂·12H₂O', name: 'ammonium iron(III) sulfate (iron alum)', molarMass: 482.2, colour: '#e9dbe6', colourName: 'pale violet',
   dissolves: { 'NH4+': 1, 'Fe3+': 1, 'SO4 2-': 2 },
   thermal: [{ minTemp: 40, halfLife: 12, products: { 'FeAlum-melt(s)': 1, ...W(12) },
@@ -214,7 +214,7 @@ c({ id: 'BaCO3', formula: 'BaCO₃', name: 'barium carbonate', molarMass: 197.3,
 c({ id: 'CaCO3', formula: 'CaCO₃', name: 'calcium carbonate', molarMass: 100.1, colour: '#fafafa', colourName: 'white', asSpecies: 'CaCO3(s)' })
 c({ id: 'ZnCO3', formula: 'ZnCO₃', name: 'zinc carbonate (basic)', molarMass: 125.4, colour: '#fafafa', colourName: 'white', asSpecies: 'ZnCO3(s)' })
 c({ id: 'MgCO3', formula: 'MgCO₃', name: 'magnesium carbonate (basic)', molarMass: 84.3, colour: '#fafafa', colourName: 'white', asSpecies: 'MgCO3(s)' })
-c({ id: 'CuCO3', formula: 'CuCO₃·Cu(OH)₂', name: 'basic copper(II) carbonate', molarMass: 110.6, colour: '#5fae9a', colourName: 'green', asSpecies: 'CuCO3(s)' })
+c({ id: 'CuCO3', formula: 'Cu₂(OH)₂CO₃', name: 'basic copper(II) carbonate', molarMass: 221.1, colour: '#5fae9a', colourName: 'green', asSpecies: 'CuCO3(s)' })
 c({ id: 'PbCO3', formula: 'PbCO₃', name: 'lead(II) carbonate', molarMass: 267.2, colour: '#fafafa', colourName: 'white', asSpecies: 'PbCO3(s)' })
 c({ id: 'FeCO3', formula: 'FeCO₃', name: 'iron(II) carbonate', molarMass: 115.9, colour: '#b9c3a6', colourName: 'pale green', asSpecies: 'FeCO3(s)' })
 c({ id: 'CuO', formula: 'CuO', name: 'copper(II) oxide', molarMass: 79.5, colour: '#1f1b19', colourName: 'black', asSpecies: 'CuO(s)' })
@@ -245,7 +245,7 @@ export function compoundSpecies(id: string): string {
 // (insoluble starting materials and residues / precipitates heated dry)
 export const SOLID_THERMAL: Record<string, ThermalStep[]> = {
   'ZnCO3(s)': [{ minTemp: 300, halfLife: 12, products: { 'ZnO(s)': 1, 'CO2(g)': 1, ...W(0.4) }, events: hydrateEvents }],
-  'CuCO3(s)': [{ minTemp: 250, halfLife: 12, products: { 'CuO(s)': 1, 'CO2(g)': 0.5, ...W(0.5) }, events: ['green solid turns black', ...hydrateEvents] }],
+  'CuCO3(s)': [{ minTemp: 250, halfLife: 12, products: { 'CuO(s)': 2, 'CO2(g)': 1, ...W(1) }, events: ['green solid turns black', ...hydrateEvents] }],
   'MgCO3(s)': [{ minTemp: 400, halfLife: 20, products: { 'MgO(s)': 1, 'CO2(g)': 1, ...W(0.2) }, events: hydrateEvents }],
   'PbCO3(s)': [{ minTemp: 320, halfLife: 15, products: { 'PbO(s)': 1, 'CO2(g)': 1 }, events: [] }],
   'FeCO3(s)': [{ minTemp: 300, halfLife: 15, products: { 'Fe2O3(s)': 0.5, 'CO2(g)': 1 }, events: [] }],
@@ -254,7 +254,8 @@ export const SOLID_THERMAL: Record<string, ThermalStep[]> = {
   'Na2CO3(s)': [],
   'FeSO4(s)': [{ minTemp: 480, halfLife: 20, products: { 'Fe2O3(s)': 0.5, 'SO2(g)': 0.5, 'SO3(g)': 0.5 }, events: ['white solid turns red-brown', 'acidic fumes with a choking smell'] }],
   'CrAlum-green(s)': [],
-  'FeAlum-melt(s)': [{ minTemp: 400, halfLife: 30, products: { 'Fe2O3(s)': 0.5, 'NH3(g)': 0.5, 'SO3(g)': 1 }, events: ['residue turns red-brown', 'white fumes'] }],
+  'FeAlum-melt(s)': [{ minTemp: 400, halfLife: 30, products: { 'Fe2O3(s)': 0.5, 'NH3(g)': 1, 'SO3(g)': 2, ...W(0.5) }, events: ['residue turns red-brown', 'white fumes'] }],
+  'Mohr-dry(s)': [{ minTemp: 280, halfLife: 40, products: { 'FeSO4(s)': 1, 'NH4HSO4(s)': 1, 'NH3(g)': 1 }, events: ['white fumes'] }],
   'K2MnO4(s)': [],
   'Ca(NO3)2(s)': [{ minTemp: 500, halfLife: 40, products: { 'CaO(s)': 1, 'NO2(g)': 2, 'O2(g)': 0.5 }, events: ['brown gas given off'] }],
   'NH4HSO4(s)': [{ minTemp: 450, halfLife: 60, products: { 'NH3(g)': 1, 'SO3(g)': 1, ...W(1) }, events: ['white fumes'] }],
@@ -265,7 +266,8 @@ export const MIXED_THERMAL: { needs: string[]; step: ThermalStep; reactant: stri
   {
     reactant: 'cmp:KI',
     needs: ['ZnCO3(s)', 'ZnO(s)'],
-    step: { minTemp: 380, halfLife: 200, products: { 'I2(g)': 0.05 }, events: ['purple vapour seen'] },
+    // Trace oxidation in air; most iodide remains. Oxygen/water are implicit reservoirs.
+    step: { minTemp: 380, halfLife: 200, products: { 'cmp:KI': 0.9, 'K2O(s)': 0.05, 'I2(g)': 0.05 }, events: ['purple vapour seen'] },
   },
 ]
 

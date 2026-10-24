@@ -71,6 +71,7 @@ export const P9701_s25_31: PaperCase = {
     'FA 9: anhydrous sodium carbonate, Na₂CO₃ (1.0 g).',
   ],
   supervisor(lab: Lab) {
+    for (const sample of lab.sampleDefs) lab.setStopper(sample.id, false)
     const tube = () => {
       const v = lab.newVessel('test-tube')
       lab.transfer('FA7', v.id, { depth: 1 })
@@ -155,6 +156,7 @@ export const P9701_w24_34: PaperCase = {
   ],
   identities: ['FB 6: potassium manganate(VII), KMnO₄ (0.5 g).', 'FB 7: 0.25 mol dm⁻³ copper(II) sulfate (62.4 g CuSO₄·5H₂O per dm³).'],
   supervisor(lab: Lab) {
+    for (const sample of lab.sampleDefs) lab.setStopper(sample.id, false)
     const h = lab.newVessel('hard-glass-tube')
     lab.transfer('FB6', h.id, { all: true })
     const ai = t(lab.heat(h.id, 'gentle', 20), lab.heat(h.id, 'strong', 40), lab.gasTest(h.id, 'glowing-splint'))
@@ -237,6 +239,7 @@ export const P9701_s24_33: PaperCase = {
   ],
   identities: ['FA 5: zinc carbonate (any basic form) and potassium iodide mixed 2 : 1 by mass (2.0 g).'],
   supervisor(lab: Lab) {
+    for (const sample of lab.sampleDefs) lab.setStopper(sample.id, false)
     const h = lab.newVessel('hard-glass-tube')
     lab.transfer('FA5', h.id, { spatula: 'normal' })
     const t1 = t(lab.heat(h.id, 'gentle', 20), lab.heat(h.id, 'strong', 40))

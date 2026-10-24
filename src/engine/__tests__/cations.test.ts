@@ -81,7 +81,7 @@ describe('cations with aqueous sodium hydroxide (IGCSE/AS notes)', () => {
     expect(r.excess).toMatch(/dissolves, giving a colourless solution/)
   })
   test('NH4+: no ppt; ammonia produced on warming', () => {
-    const lab = solutionLab(SALTS.NH4)
+    const lab = solutionLab({ 'NH4+': 0.05, 'Cl-': 0.05 })
     const t = portion(lab, 1, 'boiling-tube')
     const r = text(lab.addReagent(t, 'NaOH', { depth: 1 }))
     expect(r).toMatch(/No visible change/)

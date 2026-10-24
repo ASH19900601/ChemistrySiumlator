@@ -19,7 +19,7 @@ How Qualitative Analysis Lab is built, how the chemistry engine works, and how t
 
 ## 1. Setup and commands
 
-Node.js 18+ (developed on Node 22) and npm.
+Node.js 22+ (Node 22 LTS recommended; also validated on Node 24.19.0) and npm.
 
 For a fresh checkout, first follow the [README setup](../README.md#quick-start): the original-paper library needs Git LFS, Python 3.11+, the pinned `tools/requirements.txt`, and `npm run prepare:papers`. `npm run build` now checks the generated sources before compiling. `npm run test:browser` runs the Chromium/touch workflows. See the [coverage ledger](paper-coverage-2023-2026.md) for the distinction between source availability, configured benches and guided regression coverage.
 
@@ -156,6 +156,7 @@ const lab = new Lab({
 })
 
 const t = lab.newVessel('test-tube')
+lab.setStopper('X', false)
 lab.transfer(lab.sampleVessel('X').id, t.id, { depth: 1 })
 for (let i = 0; i < 5; i++) console.log(lab.addReagent(t.id, 'NH3', { drops: 1 }).observations)
 console.log(lab.addReagent(t.id, 'NH3', { cm3: 4 }).observations)   // deep blue solution
@@ -290,7 +291,7 @@ r({ id: 'ClO+H+Cl', type: 'kinetic', reactants: { 'ClO-': 1, 'Cl-': 1, 'H+': 2 }
 Guidelines:
 
 - Choose `priority` by what must happen first: neutralisation (1) → carbonate / sulfite protonation (2–3) → precipitation (3) → complexation / dissolving in excess (4–5) → redox.
-- Rules must conserve charge (tested) and atoms.
+- Rules must conserve charge and every tracked non-H/O element (both tested). Solvent water and atmospheric oxygen are implicit reservoirs.
 - Prefer real constants (Ksp, K) and adjust only where needed to reproduce what the syllabus notes and mark schemes describe. Add a comment when a value is tuned.
 - Use `events` for things that are seen but are not a change in amount (e.g. `'effervescence'`, `'crackling'`).
 - After a change, run all tests — a new rule can change the results of other papers.

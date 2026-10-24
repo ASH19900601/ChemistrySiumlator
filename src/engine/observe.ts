@@ -123,6 +123,7 @@ export function drySolidDescription(v: Vessel): { name: string; rgb: RGB } | nul
     const rgb = mixColours(colouredParts)
     return { name: nameFromRgb(rgb), rgb }
   }
+  if (parts.every(p => p.name === 'white')) return { name: 'white', rgb: mixColours(parts) }
   if (parts[0].w > 0.75 * tot) return { name: parts[0].name, rgb: parts[0].rgb }
   const rgb = mixColours(parts)
   const name = nameFromRgb(rgb)
@@ -157,6 +158,8 @@ export function describe(
     if (!out.some((o) => o.text === text)) out.push({ kind, text })
   }
   const wet = after.wet || before.wet
+
+  for (const e of events) if (e.kind === 'solver-limit' || e.kind === 'safety') push('event', e.text!)
 
   // ---- gases
   let bubbleGas = 0
@@ -230,7 +233,7 @@ export function describe(
     const aAmt = after.amounts[id] ?? 0
     const bw = before.wet
     const aw = after.wet
-    const word = solidWord(id, added, aw)
+    const word = solidWord(id, added, bw && aw)
     if (!wet) continue
     const vb = visibleIn(before, id)
     // the last few grains of an added solid that is visibly dissolving are not worth reporting
@@ -251,7 +254,8 @@ export function describe(
     } else if (vb && bw === aw && aAmt > 1.2 * bAmt && word === 'precipitate') {
       more.push(id)
     } else if (bw !== aw && vb && va && added.has(id) && !PIECES.has(id) && aAmt > 0.9 * bAmt) {
-      push('solid', `The ${colourOf(id, after.T)} solid does not dissolve.`)
+      if (aAmt < 0.999999 * bAmt) push('dissolve', 'Some of the solid dissolves; some solid remains.')
+      else push('solid', `The ${colourOf(id, after.T)} solid does not dissolve.`)
     }
   }
   const T = after.T

@@ -1,4 +1,5 @@
 import { ARCHIVE_DATA } from './archive-data'
+import { sourceParts, partialReference } from './source-parts'
 import { RECENT_BENCHES } from './recent-benches'
 import type { PaperCase, PaperSource } from './types'
 
@@ -16,8 +17,8 @@ export function sourceCase(source: PaperSource): PaperCase {
     totalMarks: source.totalMarks,
     summary: bench ? 'Original question and mark scheme, with samples prepared for free bench practice.' : 'Original question, written practice and published mark scheme. Interactive bench not yet available.',
     samples: bench?.samples ?? [], reagents: bench?.reagents ?? [], intro: '',
-    parts: [{ id: 'response', label: `Q${source.question}`, text: 'Label your answers with the original part numbers. Record observations and conclusions separately.',
+    parts: sourceParts(source.id) ?? [{ id: 'response', label: `Q${source.question}`, text: 'Label your answers with the original part numbers. Record observations and conclusions separately.',
       marks: source.totalMarks, answer: { kind: 'lines', lines: 18 }, markScheme: ['Use the original mark scheme below and award marks for this question only.'] }],
-    identities: [], supervisor: () => ({}),
+    identities: [], supervisor: lab => partialReference(source.id, lab),
   }
 }

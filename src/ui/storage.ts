@@ -25,8 +25,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 export function save(key: string, value: unknown) {
   try {
     localStorage.setItem(PREFIX + key, JSON.stringify(value))
+    return true
   } catch {
-    /* ignore */
+    return false
   }
 }
 
@@ -36,4 +37,13 @@ export function remove(key: string) {
   } catch {
     /* ignore */
   }
+}
+
+export function downloadText(name: string, value: string) {
+  const url = URL.createObjectURL(new Blob([value], { type: 'text/plain;charset=utf-8' }))
+  const a = document.createElement('a')
+  a.href = url
+  a.download = name
+  a.click()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
 }

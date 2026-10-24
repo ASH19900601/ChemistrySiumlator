@@ -19,7 +19,7 @@ Unlike an "Alternative to Practical" worksheet, nothing is scripted: every tube 
 
 ## Quick start
 
-Requirements: **Node.js 18+**, npm, **Python 3.11+**, and Git LFS. Validated with Node 24.19.0. The original-paper library is generated from the checksum-verified LFS archive.
+Core requirements: **Node.js 22+** and npm. Generating the full paper library also requires **Python 3.11+** and Git LFS. Validated with Node 24.19.0. The original-paper library is generated from the checksum-verified LFS archive.
 
 ```bash
 git clone <this repository>
@@ -91,7 +91,7 @@ Tech stack: Vite 5, React 18, TypeScript 5 (strict), Vitest 2. No backend.
 
 ## Research material
 
-`dropbox_downloads/` holds the source archive in Git LFS and the research report. The archive is required to generate `public/past-papers/` for a fresh checkout; generated assets are ignored by Git and checked before production builds. Once built, `dist/` includes the source library and needs no Python or archive at runtime.
+`dropbox_downloads/` holds the source archive in Git LFS and the research report. The archive is required to generate `public/past-papers/` for a fresh checkout; generated assets are ignored by Git and verified by `npm run build:full`. Once built, `dist/` includes the source library and needs no Python or archive at runtime.
 
 ## Limitations
 
@@ -103,3 +103,13 @@ Tech stack: Vite 5, React 18, TypeScript 5 (strict), Vitest 2. No backend.
 ## Copyright
 
 Question papers, mark schemes and confidential instructions © Cambridge University Press & Assessment, reproduced for private study only. Simulated observations may differ in detail from a real laboratory.
+
+### Build profiles and assessment boundary
+
+`npm run build` builds the core lab using Node 22+ and npm, including on CI without Python or paper assets. Missing original-paper resources produce an explicit warning; source-document views require those resources. `npm run build:full` additionally checks all original PDFs and page assets, and fails if they are absent or changed. Generating those assets requires Python 3.11+, the pinned Python tools and the LFS archive. See the setup instructions above.
+
+This is a self-study simulator with self-marking, not a secure proctored assessment. Unknown identities, sample definitions and reference answers are shipped to the browser. Developer builds also expose `window.__bench` for diagnostics; production builds do not. Hiding the source or removing that hook would not protect exam answers.
+
+Concentration limits are semi-quantitative: selected salts have approximate room-temperature saturation values; other soluble salts have a 6 M numerical ceiling. The engine does not predict temperature-dependent solubility or mixed-salt phase diagrams. It balances charge and all explicitly tracked elements other than solvent water / atmospheric oxygen, whose H/O inventories are implicit.
+
+[Technical report verification and fixes](docs/technical-report-review-2026-10-24.md) (Chinese): reproducible findings, corrected claims, regression evidence and remaining simulation limits.

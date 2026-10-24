@@ -133,7 +133,7 @@ Open **Question paper** (desktop: tab on the right; phone: **📄 Paper** at the
 - Record what you **saw**, not what you expected. If you made a mistake on the bench, redo the test in a clean tube.
 - **Lab notebook** lists every action with its time and tube. Use the *Rough notes* box for anything else.
 
-Answers are saved automatically as you type.
+Answers are saved automatically as you type. Check the save-status bar; if saving fails, keep the page open and export a backup.
 
 ## 6. Finishing and self-marking
 
@@ -187,9 +187,11 @@ For long answers on an iPad, a hardware keyboard helps but is not required.
 
 Answers, rough notes, self-marks and settings (observation text, sound, whether you have seen the demonstration) are stored **in this browser on this device** (local storage). They are not sent anywhere.
 
-- They survive closing the tab or reloading — but the **bench** does not: leaving the question and coming back gives a fresh set of samples.
+- Successful saves include your bench, apparatus positions, log, written work and marks. Reloading restores the experiment paused; select **Resume experiment** to continue. No chemistry runs while the page is closed.
 - A private / incognito window, clearing site data, or a different browser or device starts empty.
-- *Try this question again* deliberately clears the answers, notes and marks for that question.
+- **Export backup** downloads an attempt file. Use **Restore an exported attempt** on the library page to import it, including on another device.
+- *Try this question again* starts an independent attempt with fresh samples and empty answers/marks. The previous attempt remains available through its browser-history URL.
+- A failed save is clearly marked. Export before leaving; memory-only work cannot survive closing the browser.
 
 ## 10. FAQ
 

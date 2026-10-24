@@ -11,9 +11,9 @@
 //  * kinetic      – slow processes that progress with time (air oxidation, thiosulfate + acid,
 //                   catalytic decomposition of H2O2, heating …).
 //
-// Fast rules are applied in ascending `priority`; whenever one fires the scan restarts from
-// the top, so e.g. added NaOH always neutralises free acid before it can precipitate a metal
-// hydroxide. Water is never written explicitly.
+// Fast rules are swept in ascending `priority`, repeating until stable. Neutralisation runs
+// before precipitation in each sweep. Water and atmospheric oxygen are implicit reservoirs;
+// every other element and electric charge must balance explicitly.
 
 import { SOLID_THERMAL, MIXED_THERMAL, COMPOUNDS, compoundSpecies } from './compounds'
 
@@ -46,6 +46,8 @@ export interface Rule {
   K?: number
   /** minimum free concentration (mol dm⁻³) of reactants that must remain */
   reserve?: Record<string, number>
+  /** Maximum forward extent for concentration limits, mmol. */
+  limit?: (ctx: RuleCtx) => number
   /** kinetic half-life in seconds (Infinity = not running) */
   halfLife?: number | ((ctx: RuleCtx) => number)
   /** extra condition */
@@ -61,15 +63,25 @@ export interface Rule {
 
 export const RULES: Rule[] = []
 const r = (rule: Rule) => {
+  // Apply the same numerical ceiling to soluble heated residues as to stock compounds.
+  if (rule.id.startsWith('dissolve:') && !rule.limit) {
+    rule.limit = x => Math.max(0, 6 - Math.max(...Object.entries(rule.products).map(([id, k]) => x.c(id) / k))) * x.V
+  }
   RULES.push(rule)
   return rule
 }
 
 // ======================================================================= dissolving solids
-// Soluble compounds dissolve as soon as there is water (shaking is assumed).
+// Approximate room-temperature saturation concentrations in formula units / dm³ solution.
+// Unlisted salts use a numerical ceiling of 6 M, not a measured solubility prediction.
+// Activities, temperature-dependent solubility and mixed-salt phase diagrams are not modelled.
+const SATURATION: Record<string, number> = { NaCl: 6.1, KCl: 4, KBr: 4.5, KI: 6,
+  KNO3: 2.6, NaHCO3: 1, K2SO4: 0.6, KMnO4: 0.4, 'Ba(NO3)2': 0.35 }
+// Solids dissolve only while the solution has capacity for more dissolved material.
 for (const d of Object.values(COMPOUNDS)) {
   if (!d.dissolves) continue
-  r({ id: `dissolve:${d.id}`, type: 'complete', priority: 0, reactants: { [compoundSpecies(d.id)]: 1 }, products: { ...d.dissolves } })
+  r({ id: `dissolve:${d.id}`, type: 'complete', priority: 0, reactants: { [compoundSpecies(d.id)]: 1 }, products: { ...d.dissolves },
+    limit: x => Math.max(0, (SATURATION[d.id] ?? 6) - Math.max(...Object.entries(d.dissolves!).map(([id, k]) => x.c(id) / k))) * x.V })
 }
 // Dehydrated residues that are soluble
 r({ id: 'dissolve:Na2CO3(s)', type: 'complete', priority: 0, reactants: { 'Na2CO3(s)': 1 }, products: { 'Na+': 2, 'CO3 2-': 1 } })
@@ -84,6 +96,8 @@ r({ id: 'dissolve:CoCl2(s)', type: 'complete', priority: 0, reactants: { 'CoCl2(
 r({ id: 'dissolve:BaCl2(s)', type: 'complete', priority: 0, reactants: { 'BaCl2(s)': 1 }, products: { 'Ba2+': 1, 'Cl-': 2 } })
 r({ id: 'dissolve:CrAlum-green(s)', type: 'complete', priority: 0, reactants: { 'CrAlum-green(s)': 1 }, products: { 'K+': 1, 'Cr3+': 1, 'SO4 2-': 2 } })
 r({ id: 'dissolve:FeAlum-melt(s)', type: 'complete', priority: 0, reactants: { 'FeAlum-melt(s)': 1 }, products: { 'NH4+': 1, 'Fe3+': 1, 'SO4 2-': 2 } })
+r({ id: 'dissolve:Mohr-dry(s)', type: 'complete', priority: 0, reactants: { 'Mohr-dry(s)': 1 }, products: { 'NH4+': 2, 'Fe2+': 1, 'SO4 2-': 2 } })
+r({ id: 'dissolve:K2O(s)', type: 'complete', priority: 0, reactants: { 'K2O(s)': 1 }, products: { 'K+': 2, 'OH-': 2 } })
 r({ id: 'dissolve:NH4Cl-sublimate(s)', type: 'complete', priority: 0, reactants: { 'NH4Cl-sublimate(s)': 1 }, products: { 'NH4+': 1, 'Cl-': 1 } })
 r({ id: 'dissolve:K2MnO4(s)', type: 'complete', priority: 0, reactants: { 'K2MnO4(s)': 1 }, products: { 'K+': 2, 'MnO4 2-': 1 } })
 const RESIDUE_IONS: Record<string, Stoich> = {
@@ -120,7 +134,7 @@ r({ id: 'ClO+H+Cl', type: 'kinetic', reactants: { 'ClO-': 1, 'Cl-': 1, 'H+': 2 }
 r({ id: 'CrO4/Cr2O7', type: 'equilibrium', priority: 3, reactants: { 'CrO4 2-': 2, 'H+': 2 }, products: { 'Cr2O7 2-': 1 }, K: 4e14 })
 r({ id: 'Cr2O7+OH', type: 'complete', priority: 2, reactants: { 'Cr2O7 2-': 1, 'OH-': 2 }, products: { 'CrO4 2-': 2 } })
 // ammonium + hydroxide (strong base liberates ammonia)
-r({ id: 'NH4+OH', type: 'complete', priority: 4, reactants: { 'NH4+': 1, 'OH-': 1 }, products: { NH3: 1 } })
+r({ id: 'NH4+OH', type: 'equilibrium', priority: 1, reactants: { 'NH4+': 1, 'OH-': 1 }, products: { NH3: 1 }, K: 1 / 1.8e-5 })
 
 // ======================================================================= precipitation (Ksp equilibria)
 const ppt = (id: string, ions: Stoich, solid: string, Ksp: number, priority = 3) =>
@@ -164,7 +178,7 @@ ppt('BaCO3', { 'Ba2+': 1, 'CO3 2-': 1 }, 'BaCO3(s)', 2.6e-9)
 ppt('CaCO3', { 'Ca2+': 1, 'CO3 2-': 1 }, 'CaCO3(s)', 3.4e-9)
 ppt('MgCO3', { 'Mg2+': 1, 'CO3 2-': 1 }, 'MgCO3(s)', 6.8e-6)
 ppt('ZnCO3', { 'Zn2+': 1, 'CO3 2-': 1 }, 'ZnCO3(s)', 1.5e-10)
-ppt('CuCO3', { 'Cu2+': 1, 'CO3 2-': 1 }, 'CuCO3(s)', 1.4e-10)
+r({ id: 'ppt:CuCO3', type: 'complete', priority: 3, reactants: { 'Cu2+': 2, 'CO3 2-': 2 }, products: { 'CuCO3(s)': 1, 'CO2(aq)': 1 } })
 ppt('FeCO3', { 'Fe2+': 1, 'CO3 2-': 1 }, 'FeCO3(s)', 3e-11)
 ppt('NiCO3', { 'Ni2+': 1, 'CO3 2-': 1 }, 'NiCO3(s)', 1.4e-7)
 ppt('MnCO3', { 'Mn2+': 1, 'CO3 2-': 1 }, 'MnCO3(s)', 2.2e-11)
@@ -179,9 +193,10 @@ for (const [m, oh] of [['Al3+', 'Al(OH)3(s)'], ['Cr3+', 'Cr(OH)3(s)'], ['Fe3+', 
   r({ id: `hyd:${m}+HCO3`, type: 'complete', priority: 3, reactants: { [m]: 1, 'HCO3-': 3 }, products: { [oh]: 1, 'CO2(aq)': 3 } })
 }
 // M2+ + 2HCO3- -> MCO3 + CO2 (+H2O)
-for (const [m, s] of [['Cu2+', 'CuCO3(s)'], ['Zn2+', 'ZnCO3(s)'], ['Fe2+', 'FeCO3(s)'], ['Pb2+', 'PbCO3(s)'], ['Mn2+', 'MnCO3(s)'], ['Ni2+', 'NiCO3(s)']] as const) {
+for (const [m, s] of [['Zn2+', 'ZnCO3(s)'], ['Fe2+', 'FeCO3(s)'], ['Pb2+', 'PbCO3(s)'], ['Mn2+', 'MnCO3(s)'], ['Ni2+', 'NiCO3(s)']] as const) {
   r({ id: `hyd:${m}+HCO3`, type: 'complete', priority: 3, reactants: { [m]: 1, 'HCO3-': 2 }, products: { [s]: 1, 'CO2(aq)': 1 } })
 }
+r({ id: 'hyd:Cu2++HCO3', type: 'complete', priority: 3, reactants: { 'Cu2+': 2, 'HCO3-': 4 }, products: { 'CuCO3(s)': 1, 'CO2(aq)': 3 } })
 r({ id: 'hyd:Ag+HCO3', type: 'complete', priority: 3, reactants: { 'Ag+': 2, 'HCO3-': 2 }, products: { 'Ag2CO3(s)': 1, 'CO2(aq)': 1 } })
 
 // ======================================================================= weak base: aqueous ammonia
@@ -193,7 +208,8 @@ const nh3ppt: [string, string, number][] = [
   ['Mn2+', 'Mn(OH)2(s)', 2], ['Pb2+', 'Pb(OH)2(s)', 2], ['Mg2+', 'Mg(OH)2(s)', 2],
 ]
 for (const [m, s, k] of nh3ppt) {
-  r({ id: `nh3ppt:${m}`, type: 'complete', priority: 4, reactants: { [m]: 1, NH3: k }, products: { [s]: 1, 'NH4+': k } })
+  const hydroxide = RULES.find(rule => rule.id === `ppt:${s.replace('(s)', '')}`)!
+  r({ id: `nh3ppt:${m}`, type: 'equilibrium', priority: 4, reactants: { [m]: 1, NH3: k }, products: { [s]: 1, 'NH4+': k }, K: 1.8e-5 ** k * hydroxide.K! })
 }
 r({ id: 'nh3ppt:Ag+', type: 'complete', priority: 4, reactants: { 'Ag+': 2, NH3: 2 }, products: { 'Ag2O(s)': 1, 'NH4+': 2 } })
 
@@ -246,11 +262,11 @@ for (const [s, prod, h] of acidDissolve) {
 // Carbonates react with acid with effervescence. Solid carbonates dissolve over a few seconds.
 const carbonates: [string, Stoich][] = [
   ['BaCO3(s)', { 'Ba2+': 1 }], ['CaCO3(s)', { 'Ca2+': 1 }], ['MgCO3(s)', { 'Mg2+': 1 }], ['ZnCO3(s)', { 'Zn2+': 1 }],
-  ['CuCO3(s)', { 'Cu2+': 1 }], ['FeCO3(s)', { 'Fe2+': 1 }], ['NiCO3(s)', { 'Ni2+': 1 }], ['MnCO3(s)', { 'Mn2+': 1 }],
+  ['CuCO3(s)', { 'Cu2+': 2 }], ['FeCO3(s)', { 'Fe2+': 1 }], ['NiCO3(s)', { 'Ni2+': 1 }], ['MnCO3(s)', { 'Mn2+': 1 }],
   ['PbCO3(s)', { 'Pb2+': 1 }], ['Ag2CO3(s)', { 'Ag+': 2 }],
 ]
 for (const [s, prod] of carbonates) {
-  r({ id: `acid:${s}`, type: 'kinetic', reactants: { [s]: 1, 'H+': 2 }, products: { ...prod, 'CO2(aq)': 1 }, halfLife: 0.5 })
+  r({ id: `acid:${s}`, type: 'kinetic', reactants: { [s]: 1, 'H+': s === 'CuCO3(s)' ? 4 : 2 }, products: { ...prod, 'CO2(aq)': 1 }, halfLife: 0.5 })
 }
 
 // ======================================================================= redox (fast)

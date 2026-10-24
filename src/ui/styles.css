@@ -317,3 +317,22 @@ input, select, textarea { font: inherit; color: inherit; }
   .pane-side { border-top: 2px solid #cfc9bb; }
   .bottom-tabs { display: none; }
 }
+
+/* Progress and recovery controls remain visible on narrow phones. */
+.exam-heading { min-width: 0; }
+.save-status, .resume-notice { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 4px 10px; font-size: .8rem; background: #edf5f0; }
+.save-status span { flex: 1; min-width: 140px; }
+.save-status .btn { min-height: 36px; padding: 4px 8px; font-size: .8rem; }
+.save-failed { background: #fff0d2; color: #612d00; }
+.held-status { display: flex; flex: none; align-items: center; gap: 6px; padding: 4px 8px; background: #2b2622; color: white; min-height: 44px; }
+.held-status span { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.held-status .btn { flex: none; min-height: 44px; color: var(--ink); }
+.keyboard-controls { flex: none; max-height: 35dvh; overflow: auto; background: #f4f0e6; font-size: .85rem; padding: 4px 8px; }
+.keyboard-controls summary { cursor: pointer; padding: 8px 0; }
+.keyboard-controls button { margin: 3px; min-height: 44px; }
+.keyboard-controls select { max-width: 100%; }
+.mark-progress { padding: 8px 14px; margin: 0; background: #edf5f0; font-size: .85rem; }
+.unmarked, .resume-badge { display: block; font: 600 .8rem var(--font-ui); color: #765000; }
+.recovery-error { padding: 24px; }
+dialog { max-width: min(90vw, 480px); border: 1px solid #8c877c; border-radius: 10px; padding: 20px; }
+dialog::backdrop { background: #0008; }

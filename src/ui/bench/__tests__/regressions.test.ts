@@ -98,6 +98,7 @@ describe('reported bench regressions', () => {
 
   test('R08 a heating record resumes after another action uses the same vessel', () => {
     const { m, v, wait } = setup()
+    v.kind = 'hard-glass-tube'
     m.places.set(v.id, { at: 'burner', zone: 'low' })
     m.burner = { lit: true, gas: true, air: true }
     wait()
